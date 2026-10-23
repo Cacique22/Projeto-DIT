@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estação de Ingestão DIT - Backup Seguro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0b0f19;
+            --bg-surface: #111827;
+            --bg-elevated: #1f2937;
+            --bg-glass: rgba(17, 24, 39, 0.75);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-accent: rgba(6, 182, 212, 0.3);
+            
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            
+            --brand-cyan: #06b6d4;
+            --brand-blue: #3b82f6;
+            --success-green: #10b981;
+            --warning-amber: #f59e0b;
+            --danger-red: #ef4444;
+            
+            --glow-cyan: 0 0 24px rgba(6, 182, 212, 0.25);
+            --glow-green: 0 0 24px rgba(16, 185, 129, 0.25);
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.5;
+            background-image: 
+                radial-gradient(circle at 15% 10%, rgba(6, 182, 212, 0.07) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(59, 130, 246, 0.06) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px 20px 48px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 24px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .brand-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-md);
+            background: linear-gradient(135deg, var(--brand-cyan), var(--brand-blue));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--glow-cyan);
+        }
+
+        .brand-icon svg {
+            width: 26px;
+            height: 26px;
+            color: #ffffff;
+        }
+
+        .brand-text h1 {
+            font-size: 1.35rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+
+        .brand-text p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .badge-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            background: rgba(16, 185, 129, 0.12);
+            color: var(--success-green);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            box-shadow: var(--glow-green);
+        }
+
+        .badge-status.ingesting {
+            background: rgba(6, 182, 212, 0.15);
+            color: var(--brand-cyan);
+            border-color: rgba(6, 182, 212, 0.4);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .badge-status.error {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger-red);
+            border-color: rgba(239, 68, 68, 0.4);
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: currentColor;
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.3); }
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--brand-cyan), var(--brand-blue));
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+        }
+
+        .btn-primary:hover {
+            opacity: 0.95;
+            box-shadow: 0 6px 16px rgba(6, 182, 212, 0.45);
+        }
+
+        .grid-layout {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 24px;
+        }
+
+        @media (max-width: 900px) {
+            .grid-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(12px);
+            margin-bottom: 24px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-title svg {
+            width: 20px;
+            height: 20px;
+            color: var(--brand-cyan);
+        }
+
+        /* Config Form */
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg-base);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--brand-cyan);
+            box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.2);
+        }
+
+        /* Drives Quick Selector */
+        .drives-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 10px;
+            margin-bottom: 16px;
+        }
+
+        .drive-card {
+            background: var(--bg-base);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .drive-card:hover {
+            border-color: var(--brand-cyan);
+            transform: translateY(-2px);
+        }
+
+        .drive-card.selected {
+            border-color: var(--brand-cyan);
+            background: rgba(6, 182, 212, 0.08);
+            box-shadow: 0 0 16px rgba(6, 182, 212, 0.2);
+        }
+
+        .drive-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .drive-letter {
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: var(--brand-cyan);
+        }
+
+        .drive-tag {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: var(--bg-elevated);
+            color: var(--text-muted);
+        }
+
+        .drive-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 10px;
+        }
+
+        .drive-progress-bar {
+            height: 6px;
+            background: var(--bg-elevated);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+
+        .drive-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--brand-cyan), var(--brand-blue));
+            border-radius: 3px;
+        }
+
+        .drive-space {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Active Ingest Monitor */
+        .ingest-box {
+            background: linear-gradient(180deg, rgba(6, 182, 212, 0.06) 0%, transparent 100%);
+            border: 1px solid var(--border-accent);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 24px;
+            display: none;
+        }
+
+        .ingest-box.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .ingest-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .ingest-photographer {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #ffffff;
+        }
+
+        .progress-track {
+            height: 12px;
+            background: var(--bg-base);
+            border-radius: 6px;
+            overflow: hidden;
+            margin: 16px 0;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--brand-cyan), var(--success-green));
+            width: 0%;
+            transition: width 0.2s ease;
+        }
+
+        .progress-metrics {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .file-current {
+            font-size: 0.8rem;
+            color: var(--brand-cyan);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 8px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* History Table */
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px 14px;
+            color: var(--text-muted);
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-subtle);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        td {
+            padding: 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            color: var(--text-primary);
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .badge-verified {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success-green);
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 14px 20px;
+            background: var(--bg-elevated);
+            color: #ffffff;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-accent);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 999;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="brand">
+                <div class="brand-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                        <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h1>ESTAÇÃO DE INGESTÃO DIT</h1>
+                    <p>Backup Seguro de Alta Confiabilidade para Eventos</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <div id="stationBadge" class="badge-status">
+                    <span class="pulse-dot"></span>
+                    <span id="stationStatusText">SISTEMA ARMADO</span>
+                </div>
+                <button class="btn" onclick="testBuzzer()" title="Testar Sinal Sonoro">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    </svg>
+                    Bip
+                </button>
+            </div>
+        </header>
+
+        <!-- Live Ingest Monitor (aparece quando um cartão está sendo copiado) -->
+        <div id="ingestBox" class="ingest-box">
+            <div class="ingest-header">
+                <div>
+                    <span style="font-size:0.75rem; text-transform:uppercase; color:var(--brand-cyan); font-weight:700;">Ingestão em Tempo Real</span>
+                    <div id="activePhotographer" class="ingest-photographer">Cartão Detectado</div>
+                </div>
+                <span id="activeStatusBadge" class="badge-status ingesting">COPIANDO & VALIDANDO</span>
+            </div>
+            
+            <div class="progress-track">
+                <div id="progressBarFill" class="progress-bar-fill"></div>
+            </div>
+
+            <div class="progress-metrics">
+                <span id="progressFiles">0 / 0 fotos</span>
+                <span id="progressPercent">0%</span>
+                <span id="progressBytes">0 MB</span>
+            </div>
+            <div id="currentFileName" class="file-current">Iniciando pipeline de segurança...</div>
+        </div>
+
+        <div class="grid-layout">
+            <!-- Left Main Column -->
+            <div class="main-column">
+                
+                <!-- Destination & Event Settings -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                            </svg>
+                            Onde Deseja Salvar os Arquivos?
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Unidades Detectadas na Máquina (Clique para selecionar o drive de backup)</label>
+                        <div id="drivesGrid" class="drives-grid">
+                            <!-- Preenchido via API -->
+                            <div style="color:var(--text-muted); font-size:0.85rem;">Identificando discos...</div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="targetFolder">Caminho da Pasta de Destino</label>
+                        <input type="text" id="targetFolder" class="form-input mono" placeholder="Ex: D:\Backups_Eventos ou C:\Backups_Eventos">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="eventName">Nome do Evento Atual</label>
+                        <input type="text" id="eventName" class="form-input" placeholder="Ex: Casamento_Ana_e_Pedro">
+                        <small style="color:var(--text-muted); font-size:0.75rem; margin-top:4px; display:block;">
+                            Os arquivos serão organizados automaticamente em: <code>[Destino]\[Evento]\[Fotógrafo]\</code>
+                        </small>
+                    </div>
+
+                    <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:16px;">
+                        <button class="btn btn-primary" onclick="saveConfig()">Salvar Configuração</button>
+                    </div>
+                </div>
+
+                <!-- History of Ingests -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                            Histórico de Ingestões & Auditoria
+                        </div>
+                        <button class="btn" style="padding:6px 12px; font-size:0.75rem;" onclick="loadHistory()">Atualizar</button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Horário</th>
+                                    <th>Identificação / Fotógrafo</th>
+                                    <th>Fotos Copiadas</th>
+                                    <th>Puladas (Já salvas)</th>
+                                    <th>Volume</th>
+                                    <th>Integridade</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyTableBody">
+                                <tr>
+                                    <td colspan="6" style="text-align:center; color:var(--text-muted); padding:24px;">
+                                        Nenhuma ingestão registrada ainda para este evento. Insira um cartão para começar!
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Sidebar Column -->
+            <div class="sidebar-column">
+                
+                <!-- Manual Ingest Box -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+                                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+                                <line x1="6" y1="6" x2="6.01" y2="6"/>
+                                <line x1="6" y1="18" x2="6.01" y2="18"/>
+                            </svg>
+                            Disparo Manual
+                        </div>
+                    </div>
+                    <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:14px;">
+                        O sistema detecta novos cartões <b>automaticamente</b> ao plugar. Se o cartão já estiver inserido, você pode acionar manualmente:
+                    </p>
+                    <div class="form-group">
+                        <label class="form-label" for="manualSource">Drive de Origem (Cartão)</label>
+                        <input type="text" id="manualSource" class="form-input mono" placeholder="Ex: E:\ ou F:\">
+                    </div>
+                    <button class="btn btn-primary" style="width:100%; justify-content:center;" onclick="triggerManualIngest()">
+                        Ingerir Agora
+                    </button>
+                </div>
+
+                <!-- Safety Invariants Info -->
+                <div class="card" style="border-left: 3px solid var(--brand-cyan);">
+                    <div class="card-title" style="margin-bottom:12px; font-size:0.95rem;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--brand-cyan);">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                        Proteções Ativas
+                    </div>
+                    <ul style="font-size:0.8rem; color:var(--text-secondary); list-style:none; display:flex; flex-direction:column; gap:8px;">
+                        <li>🛡️ <b>Imutabilidade do Cartão:</b> Acesso somente leitura. O cartão original nunca é alterado ou apagado.</li>
+                        <li>🔒 <b>Validação SHA-256:</b> Cada foto é conferida byte a byte contra corrupção.</li>
+                        <li>⚡ <b>Idempotência Instantânea:</b> Ao plugar o cartão novamente, fotos antigas são puladas em milissegundos.</li>
+                        <li>💾 <b>Pre-Flight Disk:</b> Verifica espaço livre com margem de segurança antes de iniciar.</li>
+                    </ul>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">
+        <span id="toastMessage">Operação realizada com sucesso!</span>
+    </div>
+
+    <script>
+        let currentConfig = {};
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                currentConfig = data.Config || {};
+                
+                document.getElementById('targetFolder').value = currentConfig.TargetRootPath || '';
+                document.getElementById('eventName').value = currentConfig.EventName || '';
+                
+                renderDrives(data.Drives || []);
+                updateStationStatus(data);
+            } catch (e) {
+                console.error("Falha ao carregar status:", e);
+            }
+        }
+
+        function renderDrives(drives) {
+            const container = document.getElementById('drivesGrid');
+            if (!drives || drives.length === 0) {
+                container.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem;">Nenhum disco detectado.</div>';
+                return;
+            }
+
+            const currentPath = (document.getElementById('targetFolder').value || '').toUpperCase();
+
+            container.innerHTML = drives.map(d => {
+                const isSelected = currentPath.startsWith(d.RootDirectory.toUpperCase());
+                const fillPercent = Math.min(100, Math.max(0, 100 - d.PercentFree));
+                return `
+                    <div class="drive-card ${isSelected ? 'selected' : ''}" onclick="selectDrive('${d.RootDirectory}')">
+                        <div class="drive-header">
+                            <span class="drive-letter">${d.DriveLetter}</span>
+                            <span class="drive-tag">${d.DriveType}</span>
+                        </div>
+                        <div class="drive-label" title="${d.Label}">${d.Label}</div>
+                        <div class="drive-progress-bar">
+                            <div class="drive-progress-fill" style="width: ${fillPercent}%"></div>
+                        </div>
+                        <div class="drive-space">
+                            <span>Livre: <b>${d.FreeGB} GB</b></span>
+                            <span>${d.TotalGB} GB</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectDrive(rootPath) {
+            const clean = rootPath.replace(/\\$/, '');
+            document.getElementById('targetFolder').value = clean + '\\Backups_Eventos';
+            // Re-render drives to highlight selection
+            loadConfig();
+        }
+
+        async function saveConfig() {
+            const target = document.getElementById('targetFolder').value.trim();
+            const eventName = document.getElementById('eventName').value.trim();
+
+            if (!target || !eventName) {
+                alert("Por favor informe o caminho de destino e o nome do evento.");
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        TargetRootPath: target,
+                        EventName: eventName
+                    })
+                });
+                const result = await res.json();
+                showToast("Configuração salva com sucesso!");
+                loadConfig();
+            } catch (e) {
+                alert("Erro ao salvar configuração: " + e.message);
+            }
+        }
+
+        async function testBuzzer() {
+            try {
+                await fetch('/api/beep', { method: 'POST' });
+                showToast("Sinal sonoro testado!");
+            } catch (e) {}
+        }
+
+        async function triggerManualIngest() {
+            const source = document.getElementById('manualSource').value.trim();
+            if (!source) {
+                alert("Informe a letra ou caminho do cartão (Ex: E:\\)");
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/manual-ingest', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ SourceDrive: source })
+                });
+                const data = await res.json();
+                if (data.Error) {
+                    alert("Erro: " + data.Error);
+                } else {
+                    showToast("Ingestão iniciada com sucesso!");
+                }
+            } catch (e) {
+                alert("Erro ao disparar ingestão: " + e.message);
+            }
+        }
+
+        function updateStationStatus(data) {
+            const badge = document.getElementById('stationBadge');
+            const badgeText = document.getElementById('stationStatusText');
+            const ingestBox = document.getElementById('ingestBox');
+
+            if (data.State === "INGESTING") {
+                badge.className = "badge-status ingesting";
+                badgeText.textContent = "INGESTÃO EM ANDAMENTO";
+                
+                ingestBox.classList.add('active');
+                document.getElementById('activePhotographer').textContent = data.ActiveCard || 'Cartão em Processamento';
+                
+                const pct = data.TotalFiles > 0 ? Math.round((data.FilesDone / data.TotalFiles) * 100) : 0;
+                document.getElementById('progressBarFill').style.width = pct + '%';
+                document.getElementById('progressPercent').textContent = pct + '%';
+                document.getElementById('progressFiles').textContent = `${data.FilesDone} / ${data.TotalFiles} fotos`;
+                
+                const mb = (data.BytesDone / (1024 * 1024)).toFixed(1);
+                const totalMb = (data.TotalBytes / (1024 * 1024)).toFixed(1);
+                document.getElementById('progressBytes').textContent = `${mb} MB / ${totalMb} MB`;
+                document.getElementById('currentFileName').textContent = data.CurrentFile || 'Verificando integridade SHA-256...';
+            } else {
+                badge.className = "badge-status";
+                badgeText.textContent = "SISTEMA ARMADO";
+                ingestBox.classList.remove('active');
+            }
+        }
+
+        async function loadHistory() {
+            try {
+                const res = await fetch('/api/history');
+                const list = await res.json();
+                const tbody = document.getElementById('historyTableBody');
+                
+                if (!list || list.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="6" style="text-align:center; color:var(--text-muted); padding:24px;">
+                                Nenhuma ingestão registrada ainda para este evento.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                tbody.innerHTML = list.map(item => {
+                    const time = new Date(item.Timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    const mb = (item.BytesCopied / (1024 * 1024)).toFixed(1);
+                    return `
+                        <tr>
+                            <td class="mono">${time}</td>
+                            <td><b>${item.CardIdentifier}</b></td>
+                            <td class="mono" style="color:var(--success-green); font-weight:700;">+${item.CopiedCount} fotos</td>
+                            <td class="mono" style="color:var(--text-muted);">${item.SkippedCount} fotos</td>
+                            <td class="mono">${mb} MB</td>
+                            <td><span class="badge-verified">✓ SHA-256 OK</span></td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error("Falha ao carregar histórico:", e);
+            }
+        }
+
+        // Inicialização e Polling
+        loadConfig();
+        loadHistory();
+        setInterval(async () => {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                updateStationStatus(data);
+            } catch (e) {}
+        }, 1500);
+    </script>
+</body>
+</html>

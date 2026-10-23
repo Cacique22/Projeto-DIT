@@ -1,0 +1,6 @@
+# Dados gerados localmente
+config.json
+*.tmp
+*.staging.tmp
+*.log
+Backups_Eventos/
