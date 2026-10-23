@@ -1,7 +1,13 @@
-# App-Desktop.ps1 - Aplicativo Grafico Nativo da Estacao de Ingestao DIT
+﻿# App-Desktop.ps1 - Aplicativo Gráfico Nativo da Estação de Ingestão DIT
 try {
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
+} catch {}
+
+# Renderização nítida em telas com escala de 125%, 150% etc.
+try {
+    Add-Type -Namespace DitNative -Name Dpi -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetProcessDPIAware();'
+    [void][DitNative.Dpi]::SetProcessDPIAware()
 } catch {}
 
 $candidates = [System.Collections.Generic.List[string]]::new()
@@ -34,25 +40,79 @@ if (Test-Path $configPath) { . $configPath }
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 # -----------------------------------------------------------------------------
-# PALETA DE CORES E FONTES DIT PROFISSIONAL
+# ESCALA DE TELA (DPI)
 # -----------------------------------------------------------------------------
-$colorBg         = [System.Drawing.Color]::FromArgb(11, 15, 25)
-$colorSurface    = [System.Drawing.Color]::FromArgb(17, 24, 39)
-$colorElevated   = [System.Drawing.Color]::FromArgb(31, 41, 55)
-$colorBorder     = [System.Drawing.Color]::FromArgb(55, 65, 81)
-$colorText       = [System.Drawing.Color]::FromArgb(248, 250, 252)
-$colorMuted      = [System.Drawing.Color]::FromArgb(148, 163, 184)
-$colorCyan       = [System.Drawing.Color]::FromArgb(6, 182, 212)
-$colorGreen      = [System.Drawing.Color]::FromArgb(16, 185, 129)
-$colorAmber      = [System.Drawing.Color]::FromArgb(245, 158, 11)
-$colorRed        = [System.Drawing.Color]::FromArgb(239, 68, 68)
+$script:DpiScale = 1.0
+try {
+    $gdi = [System.Drawing.Graphics]::FromHwnd([IntPtr]::Zero)
+    $script:DpiScale = [double]$gdi.DpiX / 96.0
+    $gdi.Dispose()
+} catch {}
 
-$fontTitle       = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
-$fontSubTitle    = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
-$fontRegular     = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Regular)
-$fontBold        = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
-$fontSmall       = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Regular)
-$fontMono        = New-Object System.Drawing.Font("Consolas", 9, [System.Drawing.FontStyle]::Regular)
+function Px {
+    param([double]$Value)
+    return [int][math]::Round($Value * $script:DpiScale)
+}
+
+# -----------------------------------------------------------------------------
+# SISTEMA DE DESIGN: CORES, FONTES E PINCÉIS
+# -----------------------------------------------------------------------------
+function New-Rgb {
+    param([int]$R, [int]$G, [int]$B)
+    return [System.Drawing.Color]::FromArgb($R, $G, $B)
+}
+
+function Get-Blend {
+    param([System.Drawing.Color]$Front, [System.Drawing.Color]$Back, [double]$Amount)
+    $r = [int][math]::Round($Front.R * $Amount + $Back.R * (1 - $Amount))
+    $g = [int][math]::Round($Front.G * $Amount + $Back.G * (1 - $Amount))
+    $b = [int][math]::Round($Front.B * $Amount + $Back.B * (1 - $Amount))
+    return [System.Drawing.Color]::FromArgb($r, $g, $b)
+}
+
+$colorBg            = New-Rgb 9 13 22
+$colorSurface       = New-Rgb 16 23 38
+$colorSurfaceAlt    = New-Rgb 12 18 31
+$colorElevated      = New-Rgb 30 41 62
+$colorElevatedHover = New-Rgb 42 56 82
+$colorBorder        = New-Rgb 40 53 78
+$colorText          = New-Rgb 241 245 249
+$colorMuted         = New-Rgb 148 163 184
+$colorDim           = New-Rgb 107 122 148
+$colorCyan          = New-Rgb 34 211 238
+$colorCyanBtn       = New-Rgb 14 165 198
+$colorGreen         = New-Rgb 52 211 153
+$colorGreenBtn      = New-Rgb 16 185 129
+$colorAmber         = New-Rgb 251 191 36
+$colorRed           = New-Rgb 248 113 113
+$colorOnAccent      = New-Rgb 4 18 28
+$colorDisabledBg    = New-Rgb 24 33 50
+$colorSelect        = Get-Blend $colorCyan $colorSurface 0.16
+$colorRowAlt        = Get-Blend $colorText $colorSurface 0.025
+
+$brushSurface = New-Object System.Drawing.SolidBrush($colorSurface)
+$brushHeader  = New-Object System.Drawing.SolidBrush($colorSurfaceAlt)
+$brushSelect  = New-Object System.Drawing.SolidBrush($colorSelect)
+$brushRowAlt  = New-Object System.Drawing.SolidBrush($colorRowAlt)
+$brushElev    = New-Object System.Drawing.SolidBrush($colorElevated)
+$penBorder    = New-Object System.Drawing.Pen($colorBorder, 1)
+$penFocus     = New-Object System.Drawing.Pen($colorCyan, 1)
+$penRow       = New-Object System.Drawing.Pen((Get-Blend $colorBorder $colorSurface 0.55), 1)
+
+$fontHero     = New-Object System.Drawing.Font("Segoe UI", 15, [System.Drawing.FontStyle]::Bold)
+$fontTitle    = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
+$fontSubTitle = New-Object System.Drawing.Font("Segoe UI", 10.5, [System.Drawing.FontStyle]::Bold)
+$fontRegular  = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Regular)
+$fontBold     = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
+$fontSmall    = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Regular)
+$fontCaps     = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Bold)
+$fontMono     = New-Object System.Drawing.Font("Consolas", 9.5, [System.Drawing.FontStyle]::Regular)
+
+$script:TextFlags = [System.Windows.Forms.TextFormatFlags]::Left -bor `
+    [System.Windows.Forms.TextFormatFlags]::VerticalCenter -bor `
+    [System.Windows.Forms.TextFormatFlags]::EndEllipsis -bor `
+    [System.Windows.Forms.TextFormatFlags]::NoPrefix -bor `
+    [System.Windows.Forms.TextFormatFlags]::SingleLine
 
 # -----------------------------------------------------------------------------
 # ESTADO GLOBAL DA APLICACAO
@@ -63,75 +123,448 @@ $script:MonitoringActive   = Get-MonitoringState
 $script:IsIngesting        = $false
 $script:CancelRequested    = $false
 $script:RegisteredResult   = $null
+$script:StatusState        = 'idle'
+$script:StatusColor        = $colorGreen
+$script:ProgressPct        = 0
+
+# -----------------------------------------------------------------------------
+# COMPONENTES VISUAIS REUTILIZÁVEIS
+# -----------------------------------------------------------------------------
+function Enable-DoubleBuffer {
+    param($Control)
+    try {
+        $prop = [System.Windows.Forms.Control].GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]'Instance,NonPublic')
+        $prop.SetValue($Control, $true, $null)
+    } catch {}
+}
+
+function New-RoundedPath {
+    param([System.Drawing.Rectangle]$Rect, [int]$Radius)
+    $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $d = $Radius * 2
+    $path.AddArc($Rect.X, $Rect.Y, $d, $d, 180, 90)
+    $path.AddArc(($Rect.Right - $d), $Rect.Y, $d, $d, 270, 90)
+    $path.AddArc(($Rect.Right - $d), ($Rect.Bottom - $d), $d, $d, 0, 90)
+    $path.AddArc($Rect.X, ($Rect.Bottom - $d), $d, $d, 90, 90)
+    $path.CloseFigure()
+    return $path
+}
+
+function Add-RowStyle {
+    param($Table, [string]$Kind, [double]$Value = 0)
+    $k = switch ($Kind) { 'abs' { 'Absolute' } 'pct' { 'Percent' } default { 'AutoSize' } }
+    [void]$Table.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]$k, [single]$Value)))
+}
+
+function Add-ColStyle {
+    param($Table, [string]$Kind, [double]$Value = 0)
+    $k = switch ($Kind) { 'abs' { 'Absolute' } 'pct' { 'Percent' } default { 'AutoSize' } }
+    [void]$Table.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]$k, [single]$Value)))
+}
+
+function New-Table {
+    param([int]$Cols, [int]$Rows)
+    $t = New-Object System.Windows.Forms.TableLayoutPanel
+    $t.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $t.ColumnCount = $Cols
+    $t.RowCount = $Rows
+    $t.Margin = New-Object System.Windows.Forms.Padding(0)
+    $t.Padding = New-Object System.Windows.Forms.Padding(0)
+    $t.BackColor = [System.Drawing.Color]::Transparent
+    return $t
+}
+
+function New-Lbl {
+    param([string]$Text, $Font = $fontRegular, $Color = $colorText)
+    $l = New-Object System.Windows.Forms.Label
+    $l.Text = $Text
+    $l.Font = $Font
+    $l.ForeColor = $Color
+    $l.AutoSize = $true
+    $l.BackColor = [System.Drawing.Color]::Transparent
+    $l.Margin = New-Object System.Windows.Forms.Padding(0)
+    return $l
+}
+
+function Update-BtnLook {
+    param([System.Windows.Forms.Button]$Btn)
+    $style = [string]$Btn.Tag
+    if (-not $Btn.Enabled) {
+        $Btn.BackColor = $colorDisabledBg
+        $Btn.ForeColor = $colorDim
+        $Btn.FlatAppearance.MouseOverBackColor = $colorDisabledBg
+        $Btn.FlatAppearance.MouseDownBackColor = $colorDisabledBg
+        return
+    }
+    switch ($style) {
+        'primary' { $bg = $colorCyanBtn;  $fg = $colorOnAccent; $hv = $colorCyan }
+        'success' { $bg = $colorGreenBtn; $fg = $colorOnAccent; $hv = $colorGreen }
+        'danger'  { $bg = $colorElevated; $fg = $colorRed;      $hv = (Get-Blend $colorRed $colorElevated 0.22) }
+        'warning' { $bg = (Get-Blend $colorAmber $colorSurface 0.16); $fg = $colorAmber; $hv = (Get-Blend $colorAmber $colorSurface 0.30) }
+        'ghost'   { $bg = $colorSurface;  $fg = $colorMuted;    $hv = $colorElevated }
+        default   { $bg = $colorElevated; $fg = $colorText;     $hv = $colorElevatedHover }
+    }
+    $Btn.BackColor = $bg
+    $Btn.ForeColor = $fg
+    $Btn.FlatAppearance.MouseOverBackColor = $hv
+    $Btn.FlatAppearance.MouseDownBackColor = (Get-Blend $hv ([System.Drawing.Color]::Black) 0.82)
+}
+
+function New-Btn {
+    param([string]$Text, [string]$Style = 'secondary', [int]$Width = 120, [int]$Height = 36, [bool]$Bold = $true)
+    $b = New-Object System.Windows.Forms.Button
+    $b.Text = $Text
+    $b.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $b.FlatAppearance.BorderSize = 0
+    $b.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $b.Size = New-Object System.Drawing.Size($Width, $Height)
+    $b.Font = if ($Bold) { $fontBold } else { $fontRegular }
+    $b.UseVisualStyleBackColor = $false
+    $b.Tag = $Style
+    $b.Margin = New-Object System.Windows.Forms.Padding(0)
+    Update-BtnLook $b
+    $b.Add_EnabledChanged({ param($s, $e) Update-BtnLook $s })
+    return $b
+}
+
+function New-CardPanel {
+    $p = New-Object System.Windows.Forms.Panel
+    $p.BackColor = $colorBg
+    $p.Padding = New-Object System.Windows.Forms.Padding(20)
+    $p.Margin = New-Object System.Windows.Forms.Padding(0)
+    Enable-DoubleBuffer $p
+    $p.Add_Resize({ param($s, $e) $s.Invalidate() })
+    $p.Add_Paint({
+        param($s, $e)
+        $g = $e.Graphics
+        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $rect = New-Object System.Drawing.Rectangle(0, 0, ($s.Width - 1), ($s.Height - 1))
+        $path = New-RoundedPath $rect (Px 12)
+        $g.FillPath($brushSurface, $path)
+        $g.DrawPath($penBorder, $path)
+        $path.Dispose()
+    })
+    return $p
+}
+
+function New-TextInput {
+    param([string]$Text = "", $Font = $fontRegular)
+    $wrap = New-Object System.Windows.Forms.Panel
+    $wrap.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $wrap.Padding = New-Object System.Windows.Forms.Padding(12, 10, 12, 4)
+    $wrap.BackColor = $colorElevated
+    $wrap.Margin = New-Object System.Windows.Forms.Padding(0)
+    Enable-DoubleBuffer $wrap
+    $tb = New-Object System.Windows.Forms.TextBox
+    $tb.BorderStyle = [System.Windows.Forms.BorderStyle]::None
+    $tb.BackColor = $colorElevated
+    $tb.ForeColor = $colorText
+    $tb.Font = $Font
+    $tb.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $tb.Text = $Text
+    $wrap.Controls.Add($tb)
+    $wrap.Add_Paint({
+        param($s, $e)
+        $pen = if ($s.Tag -eq 'focus') { $penFocus } else { $penBorder }
+        $e.Graphics.DrawRectangle($pen, 0, 0, ($s.Width - 1), ($s.Height - 1))
+    })
+    $tb.Add_Enter({ param($s, $e) $s.Parent.Tag = 'focus'; $s.Parent.Invalidate() })
+    $tb.Add_Leave({ param($s, $e) $s.Parent.Tag = $null; $s.Parent.Invalidate() })
+    return $tb
+}
+
+function New-ComboInput {
+    param($Font = $fontRegular)
+    $wrap = New-Object System.Windows.Forms.Panel
+    $wrap.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $wrap.Padding = New-Object System.Windows.Forms.Padding(8, 7, 8, 0)
+    $wrap.BackColor = $colorElevated
+    $wrap.Margin = New-Object System.Windows.Forms.Padding(0)
+    Enable-DoubleBuffer $wrap
+    $cb = New-Object System.Windows.Forms.ComboBox
+    $cb.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $cb.BackColor = $colorElevated
+    $cb.ForeColor = $colorText
+    $cb.Font = $Font
+    $cb.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $cb.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDown
+    $wrap.Controls.Add($cb)
+    $wrap.Add_Paint({
+        param($s, $e)
+        $pen = if ($s.Tag -eq 'focus') { $penFocus } else { $penBorder }
+        $e.Graphics.DrawRectangle($pen, 0, 0, ($s.Width - 1), ($s.Height - 1))
+    })
+    $cb.Add_Enter({ param($s, $e) $s.Parent.Tag = 'focus'; $s.Parent.Invalidate() })
+    $cb.Add_Leave({ param($s, $e) $s.Parent.Tag = $null; $s.Parent.Invalidate() })
+    return $cb
+}
+
+function Set-FlexColumn {
+    param([System.Windows.Forms.ListView]$List, [int]$Index, [int]$Min = 100)
+    $fixed = 0
+    for ($i = 0; $i -lt $List.Columns.Count; $i++) {
+        if ($i -ne $Index) { $fixed += $List.Columns[$i].Width }
+    }
+    $w = $List.ClientSize.Width - $fixed
+    if ($w -lt (Px $Min)) { $w = (Px $Min) }
+    $List.Columns[$Index].Width = $w
+}
+
+function Initialize-DarkList {
+    param([System.Windows.Forms.ListView]$List, [int]$RowHeight = 42)
+    $List.View = [System.Windows.Forms.View]::Details
+    $List.FullRowSelect = $true
+    $List.GridLines = $false
+    $List.MultiSelect = $false
+    $List.HideSelection = $false
+    $List.BorderStyle = [System.Windows.Forms.BorderStyle]::None
+    $List.BackColor = $colorSurface
+    $List.ForeColor = $colorText
+    $List.Font = $fontRegular
+    $List.HeaderStyle = [System.Windows.Forms.ColumnHeaderStyle]::Nonclickable
+    $List.OwnerDraw = $true
+    $List.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $imgs = New-Object System.Windows.Forms.ImageList
+    $imgs.ImageSize = New-Object System.Drawing.Size(1, (Px $RowHeight))
+    $List.SmallImageList = $imgs
+    Enable-DoubleBuffer $List
+
+    $List.Add_DrawColumnHeader({
+        param($s, $e)
+        $e.Graphics.FillRectangle($brushHeader, $e.Bounds)
+        $e.Graphics.DrawLine($penBorder, $e.Bounds.Left, ($e.Bounds.Bottom - 1), $e.Bounds.Right, ($e.Bounds.Bottom - 1))
+        $r = New-Object System.Drawing.Rectangle(($e.Bounds.X + (Px 12)), $e.Bounds.Y, [math]::Max(4, ($e.Bounds.Width - (Px 16))), $e.Bounds.Height)
+        [System.Windows.Forms.TextRenderer]::DrawText($e.Graphics, $e.Header.Text, $fontCaps, $r, $colorDim, $script:TextFlags)
+    })
+
+    $List.Add_DrawItem({ param($s, $e) })
+
+    $List.Add_DrawSubItem({
+        param($s, $e)
+        $b = $e.Bounds
+        if ($e.ColumnIndex -eq 0) {
+            $b = New-Object System.Drawing.Rectangle($b.X, $b.Y, $s.Columns[0].Width, $b.Height)
+        }
+        if ($e.Item.Selected) { $brush = $brushSelect }
+        elseif (($e.ItemIndex % 2) -eq 1) { $brush = $brushRowAlt }
+        else { $brush = $brushSurface }
+        $e.Graphics.FillRectangle($brush, $b)
+        $e.Graphics.DrawLine($penRow, $b.Left, ($b.Bottom - 1), $b.Right, ($b.Bottom - 1))
+        $r = New-Object System.Drawing.Rectangle(($b.X + (Px 12)), $b.Y, [math]::Max(4, ($b.Width - (Px 16))), $b.Height)
+        [System.Windows.Forms.TextRenderer]::DrawText($e.Graphics, $e.SubItem.Text, $e.SubItem.Font, $r, $e.SubItem.ForeColor, $script:TextFlags)
+    })
+}
+
+function New-EmptyHint {
+    param([string]$Text)
+    $l = New-Object System.Windows.Forms.Label
+    $l.Text = $Text
+    $l.Font = $fontRegular
+    $l.ForeColor = $colorMuted
+    $l.BackColor = $colorSurface
+    $l.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $l.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+    $l.Padding = New-Object System.Windows.Forms.Padding(24)
+    return $l
+}
+
+function New-ModalForm {
+    param([string]$Title, [int]$Width, [int]$Height)
+    $m = New-Object System.Windows.Forms.Form
+    $m.Text = $Title
+    $m.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::Dpi
+    $m.AutoScaleDimensions = New-Object System.Drawing.SizeF(96, 96)
+    $m.ClientSize = New-Object System.Drawing.Size($Width, $Height)
+    $m.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
+    $m.BackColor = $colorBg
+    $m.ForeColor = $colorText
+    $m.Font = $fontRegular
+    $m.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+    $m.MaximizeBox = $false
+    $m.MinimizeBox = $false
+    $m.ShowInTaskbar = $false
+    $m.TopMost = $true
+    return $m
+}
+
+function New-ModalRoot {
+    param($Form, [int]$HeaderH = 88, [int]$FooterH = 72)
+    $t = New-Table 1 3
+    Add-ColStyle $t 'pct' 100
+    Add-RowStyle $t 'abs' $HeaderH
+    Add-RowStyle $t 'pct' 100
+    Add-RowStyle $t 'abs' $FooterH
+    $Form.Controls.Add($t)
+    return $t
+}
+
+function New-ModalHeader {
+    param([string]$Title, [string]$Subtitle, $Accent)
+    $p = New-Object System.Windows.Forms.Panel
+    $p.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $p.BackColor = $colorSurface
+    $p.Padding = New-Object System.Windows.Forms.Padding(28, 18, 28, 10)
+    $p.Margin = New-Object System.Windows.Forms.Padding(0)
+    Enable-DoubleBuffer $p
+    $p.Tag = $Accent
+    $p.Add_Paint({
+        param($s, $e)
+        $e.Graphics.DrawLine($penBorder, 0, ($s.Height - 1), $s.Width, ($s.Height - 1))
+        $accentBrush = New-Object System.Drawing.SolidBrush($s.Tag)
+        $e.Graphics.FillRectangle($accentBrush, 0, 0, (Px 4), $s.Height)
+        $accentBrush.Dispose()
+    })
+    $flow = New-Object System.Windows.Forms.FlowLayoutPanel
+    $flow.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $flow.FlowDirection = [System.Windows.Forms.FlowDirection]::TopDown
+    $flow.WrapContents = $false
+    $flow.BackColor = [System.Drawing.Color]::Transparent
+    $t1 = New-Lbl $Title $fontTitle $Accent
+    $t1.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 4)
+    $t2 = New-Lbl $Subtitle $fontSmall $colorMuted
+    $flow.Controls.Add($t1)
+    $flow.Controls.Add($t2)
+    $p.Controls.Add($flow)
+    return $p
+}
+
+function New-ModalFooter {
+    $f = New-Object System.Windows.Forms.FlowLayoutPanel
+    $f.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $f.FlowDirection = [System.Windows.Forms.FlowDirection]::RightToLeft
+    $f.WrapContents = $false
+    $f.BackColor = $colorSurface
+    $f.Padding = New-Object System.Windows.Forms.Padding(28, 16, 28, 12)
+    $f.Margin = New-Object System.Windows.Forms.Padding(0)
+    $f.Add_Paint({
+        param($s, $e)
+        $e.Graphics.DrawLine($penBorder, 0, 0, $s.Width, 0)
+    })
+    return $f
+}
+
+function New-StepHeader {
+    param([string]$Number, [string]$Text)
+    $t = New-Table 2 1
+    $t.Dock = [System.Windows.Forms.DockStyle]::Top
+    $t.AutoSize = $true
+    Add-ColStyle $t 'abs' 36
+    Add-ColStyle $t 'pct' 100
+    Add-RowStyle $t 'auto'
+    $badge = New-Object System.Windows.Forms.Panel
+    $badge.Size = New-Object System.Drawing.Size(26, 26)
+    $badge.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 0)
+    $badge.BackColor = $colorBg
+    $badge.Tag = $Number
+    $badge.Add_Paint({
+        param($s, $e)
+        $g = $e.Graphics
+        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $fill = New-Object System.Drawing.SolidBrush((Get-Blend $colorCyan $colorBg 0.18))
+        $g.FillEllipse($fill, 0, 0, ($s.Width - 1), ($s.Height - 1))
+        $fill.Dispose()
+        $g.DrawEllipse($penFocus, 0, 0, ($s.Width - 1), ($s.Height - 1))
+        $rc = New-Object System.Drawing.Rectangle(0, 0, $s.Width, $s.Height)
+        $fl = [System.Windows.Forms.TextFormatFlags]::HorizontalCenter -bor [System.Windows.Forms.TextFormatFlags]::VerticalCenter
+        [System.Windows.Forms.TextRenderer]::DrawText($g, [string]$s.Tag, $fontBold, $rc, $colorCyan, $fl)
+    })
+    $lbl = New-Lbl $Text $fontSubTitle $colorText
+    $lbl.Anchor = [System.Windows.Forms.AnchorStyles]::Left
+    $t.Controls.Add($badge, 0, 0)
+    $t.Controls.Add($lbl, 1, 0)
+    return $t
+}
+
+# -----------------------------------------------------------------------------
+# MODAL: PERGUNTA DE TEXTO SIMPLES
+# -----------------------------------------------------------------------------
+function Show-TextPrompt {
+    param([string]$Title, [string]$Message, [string]$DefaultText = "")
+
+    $dlg = New-ModalForm -Title $Title -Width 520 -Height 230
+    $root = New-ModalRoot -Form $dlg -HeaderH 0 -FooterH 68
+    $root.RowStyles[0].Height = 0
+
+    $body = New-Table 1 2
+    $body.Padding = New-Object System.Windows.Forms.Padding(28, 24, 28, 8)
+    Add-ColStyle $body 'pct' 100
+    Add-RowStyle $body 'abs' 52
+    Add-RowStyle $body 'abs' 44
+    $lblMsg = New-Lbl $Message $fontRegular $colorText
+    $lblMsg.MaximumSize = New-Object System.Drawing.Size((Px 460), 0)
+    $txt = New-TextInput -Text $DefaultText -Font $fontMono
+    $body.Controls.Add($lblMsg, 0, 0)
+    $body.Controls.Add($txt.Parent, 0, 1)
+    $root.Controls.Add($body, 0, 1)
+
+    $footer = New-ModalFooter
+    $btnOk = New-Btn "Continuar" 'primary' 130 38
+    $btnNo = New-Btn "Cancelar" 'secondary' 110 38
+    $btnNo.Margin = New-Object System.Windows.Forms.Padding(10, 0, 0, 0)
+    $footer.Controls.Add($btnOk)
+    $footer.Controls.Add($btnNo)
+    $root.Controls.Add($footer, 0, 2)
+
+    $dlg.AcceptButton = $btnOk
+    $dlg.CancelButton = $btnNo
+    $btnOk.Add_Click({ $dlg.DialogResult = [System.Windows.Forms.DialogResult]::OK; $dlg.Close() })
+    $btnNo.Add_Click({ $dlg.DialogResult = [System.Windows.Forms.DialogResult]::Cancel; $dlg.Close() })
+
+    $dlg.Add_Shown({ $txt.Focus(); $txt.SelectAll() })
+    $res = $dlg.ShowDialog()
+    $value = $txt.Text
+    $dlg.Dispose()
+    if ($res -eq [System.Windows.Forms.DialogResult]::OK) { return $value }
+    return $null
+}
 
 # -----------------------------------------------------------------------------
 # MODAL: SELECAO E CRIACAO DE EVENTO (INICIAL E TROCA)
 # -----------------------------------------------------------------------------
 function Show-EventSelectionModal {
     param([bool]$IsInitial = $false)
-    
-    $modal = New-Object System.Windows.Forms.Form
-    $modal.Text = "Estacao DIT - Selecao de Evento"
-    $modal.Size = New-Object System.Drawing.Size(740, 560)
-    $modal.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
-    $modal.BackColor = $colorBg
-    $modal.ForeColor = $colorText
-    $modal.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
-    $modal.MaximizeBox = $false
-    $modal.MinimizeBox = $false
-    $modal.TopMost = $true
-    
-    $pnlHeader = New-Object System.Windows.Forms.Panel
-    $pnlHeader.Dock = [System.Windows.Forms.DockStyle]::Top
-    $pnlHeader.Height = 70
-    $pnlHeader.BackColor = $colorSurface
-    $pnlHeader.Padding = New-Object System.Windows.Forms.Padding(20, 12, 20, 12)
-    $modal.Controls.Add($pnlHeader)
-    
-    $lblMTitle = New-Object System.Windows.Forms.Label
-    $lblMTitle.Text = "ORGANIZACAO DE EVENTOS DIT"
-    $lblMTitle.Font = $fontTitle
-    $lblMTitle.ForeColor = $colorCyan
-    $lblMTitle.AutoSize = $true
-    $pnlHeader.Controls.Add($lblMTitle)
-    
-    $lblMSub = New-Object System.Windows.Forms.Label
-    $lblMSub.Text = "Escolha um evento anterior para consultar auditoria/continuar ou crie um novo evento."
-    $lblMSub.Font = $fontSmall
-    $lblMSub.ForeColor = $colorMuted
-    $lblMSub.Location = New-Object System.Drawing.Point(20, 38)
-    $lblMSub.AutoSize = $true
-    $pnlHeader.Controls.Add($lblMSub)
-    
-    # Painel Esquerdo: Eventos Anteriores
-    $pnlLeft = New-Object System.Windows.Forms.Panel
-    $pnlLeft.Location = New-Object System.Drawing.Point(20, 85)
-    $pnlLeft.Size = New-Object System.Drawing.Size(350, 360)
-    $modal.Controls.Add($pnlLeft)
-    
-    $lblHistTitle = New-Object System.Windows.Forms.Label
-    $lblHistTitle.Text = "Eventos Anteriores (Historico & Auditoria)"
-    $lblHistTitle.Font = $fontBold
-    $lblHistTitle.ForeColor = $colorText
-    $lblHistTitle.Location = New-Object System.Drawing.Point(0, 0)
-    $lblHistTitle.AutoSize = $true
-    $pnlLeft.Controls.Add($lblHistTitle)
-    
+
+    $modal = New-ModalForm -Title "Estação DIT - Eventos" -Width 940 -Height 600
+    $root = New-ModalRoot -Form $modal -HeaderH 88 -FooterH 70
+
+    $titleText = if ($IsInitial) { "Bem-vindo! Qual evento você vai cobrir agora?" } else { "Trocar ou criar evento" }
+    $hdr = New-ModalHeader -Title $titleText -Subtitle "Cada evento guarda seus próprios cartões, fotógrafos e histórico. Continue um evento existente ou crie um novo." -Accent $colorCyan
+    $root.Controls.Add($hdr, 0, 0)
+
+    $body = New-Table 3 1
+    $body.Padding = New-Object System.Windows.Forms.Padding(28, 20, 28, 8)
+    Add-ColStyle $body 'pct' 52
+    Add-ColStyle $body 'abs' 20
+    Add-ColStyle $body 'pct' 48
+    Add-RowStyle $body 'pct' 100
+    $root.Controls.Add($body, 0, 1)
+
+    # ----- Cartao esquerdo: continuar evento existente
+    $pnlLeft = New-CardPanel
+    $pnlLeft.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $gridLeft = New-Table 1 3
+    Add-ColStyle $gridLeft 'pct' 100
+    Add-RowStyle $gridLeft 'abs' 34
+    Add-RowStyle $gridLeft 'pct' 100
+    Add-RowStyle $gridLeft 'abs' 48
+    $gridLeft.Controls.Add((New-Lbl "Continuar um evento" $fontSubTitle $colorText), 0, 0)
+
+    $hostList = New-Object System.Windows.Forms.Panel
+    $hostList.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $hostList.BackColor = $colorSurface
+    $hostList.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 12)
+
     $listEvents = New-Object System.Windows.Forms.ListView
-    $listEvents.Location = New-Object System.Drawing.Point(0, 24)
-    $listEvents.Size = New-Object System.Drawing.Size(350, 285)
-    $listEvents.View = [System.Windows.Forms.View]::Details
-    $listEvents.FullRowSelect = $true
-    $listEvents.GridLines = $true
-    $listEvents.MultiSelect = $false
-    $listEvents.BackColor = $colorElevated
-    $listEvents.ForeColor = $colorText
-    $listEvents.Font = $fontRegular
-    [void]$listEvents.Columns.Add("Nome do Evento", 180)
-    [void]$listEvents.Columns.Add("Cartoes", 65)
-    [void]$listEvents.Columns.Add("Criado em", 85)
-    $pnlLeft.Controls.Add($listEvents)
-    
+    Initialize-DarkList -List $listEvents -RowHeight 40
+    [void]$listEvents.Columns.Add("EVENTO", (Px 200))
+    [void]$listEvents.Columns.Add("CARTÕES", (Px 80))
+    [void]$listEvents.Columns.Add("CRIADO EM", (Px 90))
+    $listEvents.Add_Resize({ param($s, $e) Set-FlexColumn -List $s -Index 0 -Min 120 })
+    $hostList.Controls.Add($listEvents)
+
+    $lblNoEvents = New-EmptyHint "Nenhum evento anterior.`nCrie o primeiro ao lado."
+    $hostList.Controls.Add($lblNoEvents)
+
     $allEvents = @(Get-StationEvents)
     foreach ($ev in $allEvents) {
         $item = New-Object System.Windows.Forms.ListViewItem($ev.Name)
@@ -141,126 +574,108 @@ function Show-EventSelectionModal {
         } else { "-" }
         [void]$item.SubItems.Add($dtStr)
         if ($ev.Name -eq $script:CurrentEvent) {
-            $item.BackColor = [System.Drawing.Color]::FromArgb(40, 6, 182, 212)
+            $item.UseItemStyleForSubItems = $true
             $item.ForeColor = $colorCyan
             $item.Selected = $true
         }
-        $listEvents.Items.Add($item)
+        [void]$listEvents.Items.Add($item)
     }
-    
-    $btnOpenSelected = New-Object System.Windows.Forms.Button
-    $btnOpenSelected.Text = "Abrir Evento Selecionado"
-    $btnOpenSelected.Font = $fontBold
-    $btnOpenSelected.BackColor = $colorCyan
-    $btnOpenSelected.ForeColor = [System.Drawing.Color]::Black
-    $btnOpenSelected.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $btnOpenSelected.Location = New-Object System.Drawing.Point(0, 318)
-    $btnOpenSelected.Size = New-Object System.Drawing.Size(350, 36)
-    $pnlLeft.Controls.Add($btnOpenSelected)
-    
-    # Painel Direito: Criar Novo Evento
-    $pnlRight = New-Object System.Windows.Forms.Panel
-    $pnlRight.Location = New-Object System.Drawing.Point(390, 85)
-    $pnlRight.Size = New-Object System.Drawing.Size(320, 360)
-    $modal.Controls.Add($pnlRight)
-    
-    $lblNewTitle = New-Object System.Windows.Forms.Label
-    $lblNewTitle.Text = "Criar Novo Evento"
-    $lblNewTitle.Font = $fontBold
-    $lblNewTitle.ForeColor = $colorGreen
-    $lblNewTitle.Location = New-Object System.Drawing.Point(0, 0)
-    $lblNewTitle.AutoSize = $true
-    $pnlRight.Controls.Add($lblNewTitle)
-    
-    $lblNewName = New-Object System.Windows.Forms.Label
-    $lblNewName.Text = "Nome do Evento:"
-    $lblNewName.Font = $fontRegular
-    $lblNewName.Location = New-Object System.Drawing.Point(0, 28)
-    $lblNewName.AutoSize = $true
-    $pnlRight.Controls.Add($lblNewName)
-    
-    $txtNewEventName = New-Object System.Windows.Forms.TextBox
-    $txtNewEventName.Location = New-Object System.Drawing.Point(0, 48)
-    $txtNewEventName.Size = New-Object System.Drawing.Size(320, 25)
-    $txtNewEventName.BackColor = $colorElevated
-    $txtNewEventName.ForeColor = $colorText
-    $txtNewEventName.Font = $fontRegular
-    $txtNewEventName.Text = "Evento_" + (Get-Date -Format "yyyy-MM-dd")
-    $pnlRight.Controls.Add($txtNewEventName)
-    
-    $lblNewDest = New-Object System.Windows.Forms.Label
-    $lblNewDest.Text = "Pasta Base de Armazenamento:"
-    $lblNewDest.Font = $fontRegular
-    $lblNewDest.Location = New-Object System.Drawing.Point(0, 85)
-    $lblNewDest.AutoSize = $true
-    $pnlRight.Controls.Add($lblNewDest)
-    
+    if ($listEvents.Items.Count -gt 0) {
+        $lblNoEvents.Visible = $false
+    } else {
+        $lblNoEvents.BringToFront()
+    }
+    $gridLeft.Controls.Add($hostList, 0, 1)
+
+    $btnOpenSelected = New-Btn "Abrir evento selecionado" 'primary' 200 40
+    $btnOpenSelected.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $gridLeft.Controls.Add($btnOpenSelected, 0, 2)
+    $pnlLeft.Controls.Add($gridLeft)
+    $body.Controls.Add($pnlLeft, 0, 0)
+
+    # ----- Cartao direito: novo evento
+    $pnlRight = New-CardPanel
+    $pnlRight.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $gridRight = New-Table 1 8
+    Add-ColStyle $gridRight 'pct' 100
+    Add-RowStyle $gridRight 'abs' 34
+    Add-RowStyle $gridRight 'abs' 22
+    Add-RowStyle $gridRight 'abs' 42
+    Add-RowStyle $gridRight 'abs' 30
+    Add-RowStyle $gridRight 'abs' 42
+    Add-RowStyle $gridRight 'pct' 100
+    Add-RowStyle $gridRight 'abs' 48
+    Add-RowStyle $gridRight 'abs' 0
+    $gridRight.Controls.Add((New-Lbl "Criar um novo evento" $fontSubTitle $colorText), 0, 0)
+
+    $gridRight.Controls.Add((New-Lbl "Nome do evento" $fontSmall $colorMuted), 0, 1)
+    $txtNewEventName = New-TextInput -Text ("Evento_" + (Get-Date -Format "yyyy-MM-dd"))
+    $gridRight.Controls.Add($txtNewEventName.Parent, 0, 2)
+
+    $lblDestCap = New-Lbl "Pasta onde salvar" $fontSmall $colorMuted
+    $lblDestCap.Anchor = [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Left
+    $lblDestCap.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 6)
+    $gridRight.Controls.Add($lblDestCap, 0, 3)
+
     $validBaseDir = $script:CurrentConfig.TargetRootPath
     if (-not (Test-DriveIsConnected -Path $validBaseDir)) {
         $validBaseDir = Get-DefaultTargetDirectory
     }
-    
-    $txtNewEventDest = New-Object System.Windows.Forms.TextBox
-    $txtNewEventDest.Location = New-Object System.Drawing.Point(0, 107)
-    $txtNewEventDest.Size = New-Object System.Drawing.Size(235, 25)
-    $txtNewEventDest.BackColor = $colorElevated
-    $txtNewEventDest.ForeColor = $colorText
-    $txtNewEventDest.Font = $fontMono
-    $txtNewEventDest.Text = $validBaseDir
-    $pnlRight.Controls.Add($txtNewEventDest)
-    
-    $btnBrowseDest = New-Object System.Windows.Forms.Button
-    $btnBrowseDest.Text = "Procurar..."
-    $btnBrowseDest.Font = $fontRegular
-    $btnBrowseDest.BackColor = $colorElevated
-    $btnBrowseDest.ForeColor = $colorText
-    $btnBrowseDest.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $btnBrowseDest.Location = New-Object System.Drawing.Point(240, 105)
-    $btnBrowseDest.Size = New-Object System.Drawing.Size(80, 27)
-    $pnlRight.Controls.Add($btnBrowseDest)
-    
+
+    $rowDest = New-Table 2 1
+    Add-ColStyle $rowDest 'pct' 100
+    Add-ColStyle $rowDest 'abs' 108
+    Add-RowStyle $rowDest 'pct' 100
+    $txtNewEventDest = New-TextInput -Text $validBaseDir -Font $fontMono
+    $btnBrowseDest = New-Btn "Procurar..." 'secondary' 100 42 $false
+    $btnBrowseDest.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $btnBrowseDest.Margin = New-Object System.Windows.Forms.Padding(8, 0, 0, 0)
+    $rowDest.Controls.Add($txtNewEventDest.Parent, 0, 0)
+    $rowDest.Controls.Add($btnBrowseDest, 1, 0)
+    $gridRight.Controls.Add($rowDest, 0, 4)
+
+    $lblEventExpl = New-Lbl "" $fontSmall $colorMuted
+    $lblEventExpl.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $lblEventExpl.AutoSize = $false
+    $lblEventExpl.Padding = New-Object System.Windows.Forms.Padding(0, 12, 0, 0)
+    $gridRight.Controls.Add($lblEventExpl, 0, 5)
+
+    $btnCreateEvent = New-Btn "Criar e iniciar evento" 'success' 200 40
+    $btnCreateEvent.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $gridRight.Controls.Add($btnCreateEvent, 0, 6)
+    $pnlRight.Controls.Add($gridRight)
+    $body.Controls.Add($pnlRight, 2, 0)
+
+    $updateExplain = {
+        $d = $txtNewEventDest.Text.Trim()
+        if ([string]::IsNullOrWhiteSpace($d)) { $d = "[pasta de destino]" }
+        $lblEventExpl.Text = "Organização automática no disco:`n`n  $d`n      \ [Nome do fotógrafo]`n          \ fotos verificadas (SHA-256)`n`nCada cartão é associado a um único fotógrafo. Um fotógrafo pode ter vários cartões."
+    }
+    & $updateExplain
+    $txtNewEventDest.Add_TextChanged($updateExplain)
+
+    # ----- Rodape
+    $footer = New-ModalFooter
+    $closeText = if ($IsInitial) { "Continuar com o evento atual" } else { "Cancelar" }
+    $btnCancelModal = New-Btn $closeText 'secondary' 230 38
+    $footer.Controls.Add($btnCancelModal)
+    $root.Controls.Add($footer, 0, 2)
+    $modal.CancelButton = $btnCancelModal
+
     $btnBrowseDest.Add_Click({
         $fbd = New-Object System.Windows.Forms.FolderBrowserDialog
-        $fbd.Description = "Selecione a Pasta Base de Armazenamento para os Eventos"
+        $fbd.Description = "Selecione a pasta onde salvar os arquivos do evento"
         if ($fbd.ShowDialog($modal) -eq [System.Windows.Forms.DialogResult]::OK) {
             $txtNewEventDest.Text = $fbd.SelectedPath
         }
     })
-    
-    $lblEventExpl = New-Object System.Windows.Forms.Label
-    $lblEventExpl.Text = "Estrutura automatica de pastas:`n[Armazenamento]\[Evento]\[Fotografo]\...`n`nTodos os cartoes serao organizados com seguranca nesta pasta."
-    $lblEventExpl.Font = $fontSmall
-    $lblEventExpl.ForeColor = $colorMuted
-    $lblEventExpl.Location = New-Object System.Drawing.Point(0, 145)
-    $lblEventExpl.Size = New-Object System.Drawing.Size(320, 80)
-    $pnlRight.Controls.Add($lblEventExpl)
-    
-    $btnCreateEvent = New-Object System.Windows.Forms.Button
-    $btnCreateEvent.Text = "+ Criar e Iniciar Evento"
-    $btnCreateEvent.Font = $fontBold
-    $btnCreateEvent.BackColor = $colorGreen
-    $btnCreateEvent.ForeColor = [System.Drawing.Color]::Black
-    $btnCreateEvent.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $btnCreateEvent.Location = New-Object System.Drawing.Point(0, 318)
-    $btnCreateEvent.Size = New-Object System.Drawing.Size(320, 36)
-    $pnlRight.Controls.Add($btnCreateEvent)
-    
-    $btnCancelModal = New-Object System.Windows.Forms.Button
-    $btnCancelModal.Text = "Fechar"
-    $btnCancelModal.Font = $fontRegular
-    $btnCancelModal.BackColor = $colorElevated
-    $btnCancelModal.ForeColor = $colorText
-    $btnCancelModal.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $btnCancelModal.Location = New-Object System.Drawing.Point(610, 470)
-    $btnCancelModal.Size = New-Object System.Drawing.Size(100, 32)
-    $modal.Controls.Add($btnCancelModal)
-    
+
     $btnCancelModal.Add_Click({
         $modal.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
         $modal.Close()
     })
-    
-    $btnOpenSelected.Add_Click({
+
+    $openSelected = {
         if ($listEvents.SelectedItems.Count -gt 0) {
             $chosen = $listEvents.SelectedItems[0].Text
             Set-CurrentEvent -EventName $chosen | Out-Null
@@ -271,16 +686,18 @@ function Show-EventSelectionModal {
         } else {
             [System.Windows.Forms.MessageBox]::Show($modal, "Selecione um evento da lista para abrir.", "Aviso", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
         }
-    })
-    
+    }
+    $btnOpenSelected.Add_Click($openSelected)
+    $listEvents.Add_DoubleClick($openSelected)
+
     $btnCreateEvent.Add_Click({
         $evName = $txtNewEventName.Text.Trim()
         $destPath = $txtNewEventDest.Text.Trim()
         if ([string]::IsNullOrWhiteSpace($evName)) {
-            [System.Windows.Forms.MessageBox]::Show($modal, "Por favor informe o nome do evento.", "Aviso", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+            [System.Windows.Forms.MessageBox]::Show($modal, "Por favor, informe o nome do evento.", "Aviso", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
             return
         }
-        
+
         try {
             $created = New-StationEvent -EventName $evName -DefaultDestination $destPath
             $script:CurrentEvent = $created.Name
@@ -291,7 +708,7 @@ function Show-EventSelectionModal {
             [System.Windows.Forms.MessageBox]::Show($modal, "Erro ao criar evento: $_", "Erro", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
         }
     })
-    
+
     $res = $modal.ShowDialog()
     $modal.Dispose()
     return $res
@@ -307,68 +724,44 @@ function Show-CardSetupModal {
         [Parameter(Mandatory=$true)][string]$EventName,
         [PSObject]$ExistingRegistration = $null
     )
-    
+
+    $script:RegisteredResult = $null
     $isEditMode = ($null -ne $ExistingRegistration)
-    
-    $setupModal = New-Object System.Windows.Forms.Form
-    $setupModal.Text = if ($isEditMode) { "Estacao DIT - Editar Cadastro do Cartao" } else { "Estacao DIT - Cadastro Obrigatorio de Cartao" }
-    $setupModal.Size = New-Object System.Drawing.Size(640, 480)
-    $setupModal.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
-    $setupModal.BackColor = $colorBg
-    $setupModal.ForeColor = $colorText
-    $setupModal.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
-    $setupModal.MaximizeBox = $false
-    $setupModal.MinimizeBox = $false
-    $setupModal.TopMost = $true
-    
-    $pnlTop = New-Object System.Windows.Forms.Panel
-    $pnlTop.Dock = [System.Windows.Forms.DockStyle]::Top
-    $pnlTop.Height = 70
-    $pnlTop.BackColor = $colorSurface
-    $pnlTop.Padding = New-Object System.Windows.Forms.Padding(20, 12, 20, 12)
-    $setupModal.Controls.Add($pnlTop)
-    
-    $lblTop1 = New-Object System.Windows.Forms.Label
-    $lblTop1.Text = if ($isEditMode) { "EDITAR CADASTRO DO CARTAO" } else { "NOVO CARTAO DETECTADO - CONFIGURACAO DE DESTINO" }
-    $lblTop1.Font = $fontTitle
-    $lblTop1.ForeColor = if ($isEditMode) { $colorCyan } else { $colorAmber }
-    $lblTop1.AutoSize = $true
-    $pnlTop.Controls.Add($lblTop1)
-    
-    $lblTop2 = New-Object System.Windows.Forms.Label
-    $lblTop2.Text = "Unidade: $DriveLetter  |  ID do Cartao: $CardIdentifier  |  Evento: $EventName"
-    $lblTop2.Font = $fontMono
-    $lblTop2.ForeColor = $colorCyan
-    $lblTop2.Location = New-Object System.Drawing.Point(20, 40)
-    $lblTop2.AutoSize = $true
-    $pnlTop.Controls.Add($lblTop2)
-    
-    $pnlBody = New-Object System.Windows.Forms.Panel
-    $pnlBody.Location = New-Object System.Drawing.Point(20, 85)
-    $pnlBody.Size = New-Object System.Drawing.Size(585, 320)
-    $setupModal.Controls.Add($pnlBody)
-    
-    # Campo 1: Nome do Fotografo
-    $lblPhotog = New-Object System.Windows.Forms.Label
-    $lblPhotog.Text = "1. Nome do Fotografo Deste Cartao:"
-    $lblPhotog.Font = $fontBold
-    $lblPhotog.Location = New-Object System.Drawing.Point(0, 0)
-    $lblPhotog.AutoSize = $true
-    $pnlBody.Controls.Add($lblPhotog)
-    
-    $cmbPhotog = New-Object System.Windows.Forms.ComboBox
-    $cmbPhotog.Location = New-Object System.Drawing.Point(0, 24)
-    $cmbPhotog.Size = New-Object System.Drawing.Size(585, 26)
-    $cmbPhotog.BackColor = $colorElevated
-    $cmbPhotog.ForeColor = $colorText
-    $cmbPhotog.Font = $fontRegular
-    $cmbPhotog.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDown
-    
-    $existingPhotogs = @(Get-EventPhotographers -EventName $EventName)
-    foreach ($p in $existingPhotogs) {
-        [void]$cmbPhotog.Items.Add($p)
+
+    $winTitle = if ($isEditMode) { "Estação DIT - Editar cadastro do cartão" } else { "Estação DIT - Cadastro de cartão" }
+    $setupModal = New-ModalForm -Title $winTitle -Width 700 -Height 640
+    $root = New-ModalRoot -Form $setupModal -HeaderH 92 -FooterH 76
+
+    $hdrTitle = if ($isEditMode) { "Editar cadastro do cartão" } else { "Novo cartão detectado" }
+    $hdrAccent = if ($isEditMode) { $colorCyan } else { $colorAmber }
+    $hdrSub = if ($isEditMode) {
+        "Cartão $CardIdentifier  ·  Evento $EventName"
+    } else {
+        "Preencha 3 passos rápidos. É só desta vez: nas próximas inserções a descarga é automática.`nCartão $CardIdentifier  ·  Unidade $DriveLetter  ·  Evento $EventName"
     }
-    
+    $hdr = New-ModalHeader -Title $hdrTitle -Subtitle $hdrSub -Accent $hdrAccent
+    $root.Controls.Add($hdr, 0, 0)
+
+    $body = New-Table 1 9
+    $body.Padding = New-Object System.Windows.Forms.Padding(32, 20, 32, 4)
+    Add-ColStyle $body 'pct' 100
+    Add-RowStyle $body 'abs' 30   # passo 1
+    Add-RowStyle $body 'abs' 44   # combo fotografo
+    Add-RowStyle $body 'abs' 34   # dica 1
+    Add-RowStyle $body 'abs' 30   # passo 2
+    Add-RowStyle $body 'abs' 44   # combo subpasta
+    Add-RowStyle $body 'abs' 34   # dica 2
+    Add-RowStyle $body 'abs' 30   # passo 3
+    Add-RowStyle $body 'abs' 44   # destino
+    Add-RowStyle $body 'pct' 100  # dica 3
+    $root.Controls.Add($body, 0, 1)
+
+    # ----- Passo 1: fotografo
+    $body.Controls.Add((New-StepHeader "1" "Quem é o fotógrafo deste cartão?"), 0, 0)
+    $cmbPhotog = New-ComboInput
+    $existingPhotogs = @(Get-EventPhotographers -EventName $EventName)
+    foreach ($p in $existingPhotogs) { [void]$cmbPhotog.Items.Add($p) }
+
     if ($isEditMode -and $ExistingRegistration.Photographer) {
         $cmbPhotog.Text = $ExistingRegistration.Photographer
     } elseif ($existingPhotogs.Count -gt 0) {
@@ -382,81 +775,56 @@ function Show-CardSetupModal {
             $cmbPhotog.Text = "Fotografo_1"
         }
     }
-    $pnlBody.Controls.Add($cmbPhotog)
-    
-    $lblPhotogRule = New-Object System.Windows.Forms.Label
-    $lblPhotogRule.Text = "Regra DIT: Um fotografo pode ter varios cartoes, mas cada cartao pertence a um unico fotografo."
-    $lblPhotogRule.Font = $fontSmall
-    $lblPhotogRule.ForeColor = $colorMuted
-    $lblPhotogRule.Location = New-Object System.Drawing.Point(0, 52)
-    $lblPhotogRule.AutoSize = $true
-    $pnlBody.Controls.Add($lblPhotogRule)
-    
-    # Campo 2: Subpasta das Fotos no Cartao
-    $lblSubf = New-Object System.Windows.Forms.Label
-    $lblSubf.Text = "2. Subpasta onde estao as fotos no cartao (Camera):"
-    $lblSubf.Font = $fontBold
-    $lblSubf.Location = New-Object System.Drawing.Point(0, 80)
-    $lblSubf.AutoSize = $true
-    $pnlBody.Controls.Add($lblSubf)
-    
-    $cmbSubf = New-Object System.Windows.Forms.ComboBox
-    $cmbSubf.Location = New-Object System.Drawing.Point(0, 104)
-    $cmbSubf.Size = New-Object System.Drawing.Size(465, 26)
-    $cmbSubf.BackColor = $colorElevated
-    $cmbSubf.ForeColor = $colorText
-    $cmbSubf.Font = $fontMono
-    $cmbSubf.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDown
-    
+    $body.Controls.Add($cmbPhotog.Parent, 0, 1)
+    $hint1 = New-Lbl "Escolha um nome da lista ou digite um novo. Um fotógrafo pode ter vários cartões." $fontSmall $colorMuted
+    $hint1.Anchor = [System.Windows.Forms.AnchorStyles]::Left
+    $body.Controls.Add($hint1, 0, 2)
+
+    # ----- Passo 2: subpasta no cartao
+    $body.Controls.Add((New-StepHeader "2" "Em qual pasta do cartão estão as fotos?"), 0, 3)
+    $rowSubf = New-Table 2 1
+    Add-ColStyle $rowSubf 'pct' 100
+    Add-ColStyle $rowSubf 'abs' 118
+    Add-RowStyle $rowSubf 'pct' 100
+    $cmbSubf = New-ComboInput $fontMono
     $detectedFolders = @(Get-CardPhotoFolders -DriveRoot $DriveLetter)
-    foreach ($f in $detectedFolders) {
-        [void]$cmbSubf.Items.Add($f)
-    }
-    
+    foreach ($f in $detectedFolders) { [void]$cmbSubf.Items.Add($f) }
     if ($isEditMode -and $ExistingRegistration.PhotoSubfolder) {
         $cmbSubf.Text = $ExistingRegistration.PhotoSubfolder
     } elseif ($cmbSubf.Items.Count -gt 0) {
         $cmbSubf.SelectedIndex = 0
     }
-    $pnlBody.Controls.Add($cmbSubf)
-    
-    $btnBrowseCardSubf = New-Object System.Windows.Forms.Button
-    $btnBrowseCardSubf.Text = "Procurar..."
-    $btnBrowseCardSubf.Font = $fontRegular
-    $btnBrowseCardSubf.BackColor = $colorElevated
-    $btnBrowseCardSubf.ForeColor = $colorText
-    $btnBrowseCardSubf.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $btnBrowseCardSubf.Location = New-Object System.Drawing.Point(475, 102)
-    $btnBrowseCardSubf.Size = New-Object System.Drawing.Size(110, 28)
-    $pnlBody.Controls.Add($btnBrowseCardSubf)
-    
+    $btnBrowseCardSubf = New-Btn "Procurar..." 'secondary' 110 44 $false
+    $btnBrowseCardSubf.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $btnBrowseCardSubf.Margin = New-Object System.Windows.Forms.Padding(8, 0, 0, 0)
+    $rowSubf.Controls.Add($cmbSubf.Parent, 0, 0)
+    $rowSubf.Controls.Add($btnBrowseCardSubf, 1, 0)
+    $body.Controls.Add($rowSubf, 0, 4)
+    $hintText2 = if ($detectedFolders.Count -gt 0) { "Detectamos automaticamente as pastas de fotos deste cartão (ex.: DCIM\100CANON)." } else { "Não achamos uma pasta de fotos. Deixe a raiz ou use Procurar para indicar." }
+    $hint2 = New-Lbl $hintText2 $fontSmall $colorMuted
+    $hint2.Anchor = [System.Windows.Forms.AnchorStyles]::Left
+    $body.Controls.Add($hint2, 0, 5)
+
     $btnBrowseCardSubf.Add_Click({
         $fbd = New-Object System.Windows.Forms.FolderBrowserDialog
-        $fbd.Description = "Selecione a Pasta de Fotos dentro do Cartao $DriveLetter"
+        $fbd.Description = "Selecione a pasta de fotos dentro do cartão $DriveLetter"
         $fbd.SelectedPath = $DriveLetter
         if ($fbd.ShowDialog($setupModal) -eq [System.Windows.Forms.DialogResult]::OK) {
             $sel = $fbd.SelectedPath
-            $root = [System.IO.Path]::GetPathRoot($sel)
-            $rel = $sel.Substring($root.Length).TrimStart('\')
+            $root2 = [System.IO.Path]::GetPathRoot($sel)
+            $rel = $sel.Substring($root2.Length).TrimStart('\')
             $cmbSubf.Text = if ($rel) { $rel } else { "\ (Raiz do Cartao)" }
         }
     })
-    
-    # Campo 3: Pasta de Destino das Fotos
-    $lblDest = New-Object System.Windows.Forms.Label
-    $lblDest.Text = "3. Pasta Onde Salvar os Arquivos Deste Cartao:"
-    $lblDest.Font = $fontBold
-    $lblDest.Location = New-Object System.Drawing.Point(0, 145)
-    $lblDest.AutoSize = $true
-    $pnlBody.Controls.Add($lblDest)
-    
-    $txtDest = New-Object System.Windows.Forms.TextBox
-    $txtDest.Location = New-Object System.Drawing.Point(0, 169)
-    $txtDest.Size = New-Object System.Drawing.Size(465, 25)
-    $txtDest.BackColor = $colorElevated
-    $txtDest.ForeColor = $colorText
-    $txtDest.Font = $fontMono
-    
+
+    # ----- Passo 3: destino
+    $body.Controls.Add((New-StepHeader "3" "Onde salvar as fotos deste cartão?"), 0, 6)
+    $rowDest = New-Table 2 1
+    Add-ColStyle $rowDest 'pct' 100
+    Add-ColStyle $rowDest 'abs' 118
+    Add-RowStyle $rowDest 'pct' 100
+    $txtDest = New-TextInput -Text "" -Font $fontMono
+
     $curEventInfo = Get-CurrentEvent
     $baseTarget = if ($curEventInfo.DefaultDestination -and (Test-DriveIsConnected -Path $curEventInfo.DefaultDestination)) {
         $curEventInfo.DefaultDestination
@@ -465,14 +833,25 @@ function Show-CardSetupModal {
     } else {
         [System.IO.Path]::Combine((Get-DefaultTargetDirectory), $EventName)
     }
-    
+
     if ($isEditMode -and $ExistingRegistration.DestinationPath -and (Test-DriveIsConnected -Path $ExistingRegistration.DestinationPath)) {
         $txtDest.Text = $ExistingRegistration.DestinationPath
     } else {
         $txtDest.Text = [System.IO.Path]::Combine($baseTarget, ($cmbPhotog.Text -replace '[\\/:*?"<>|]', '_'))
     }
-    $pnlBody.Controls.Add($txtDest)
-    
+
+    $btnBrowseDestCard = New-Btn "Procurar..." 'secondary' 110 44 $false
+    $btnBrowseDestCard.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $btnBrowseDestCard.Margin = New-Object System.Windows.Forms.Padding(8, 0, 0, 0)
+    $rowDest.Controls.Add($txtDest.Parent, 0, 0)
+    $rowDest.Controls.Add($btnBrowseDestCard, 1, 0)
+    $body.Controls.Add($rowDest, 0, 7)
+
+    $lblNotice = New-Lbl "O destino acompanha o nome do fotógrafo automaticamente. Você pode ajustar se quiser." $fontSmall $colorMuted
+    $lblNotice.Anchor = [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Top
+    $lblNotice.Margin = New-Object System.Windows.Forms.Padding(0, 8, 0, 0)
+    $body.Controls.Add($lblNotice, 0, 8)
+
     # Atualiza destino quando o nome do fotografo mudar
     $cmbPhotog.Add_TextChanged({
         $photogClean = $cmbPhotog.Text.Trim() -replace '[\\/:*?"<>|]', '_'
@@ -485,100 +864,69 @@ function Show-CardSetupModal {
             }
         }
     })
-    
-    $btnBrowseDestCard = New-Object System.Windows.Forms.Button
-    $btnBrowseDestCard.Text = "Procurar..."
-    $btnBrowseDestCard.Font = $fontRegular
-    $btnBrowseDestCard.BackColor = $colorElevated
-    $btnBrowseDestCard.ForeColor = $colorText
-    $btnBrowseDestCard.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $btnBrowseDestCard.Location = New-Object System.Drawing.Point(475, 167)
-    $btnBrowseDestCard.Size = New-Object System.Drawing.Size(110, 28)
-    $pnlBody.Controls.Add($btnBrowseDestCard)
-    
+
     $btnBrowseDestCard.Add_Click({
         $fbd = New-Object System.Windows.Forms.FolderBrowserDialog
-        $fbd.Description = "Selecione Onde Salvar as Fotos Deste Cartao"
+        $fbd.Description = "Selecione onde salvar as fotos deste cartão"
         $fbd.SelectedPath = $baseTarget
         if ($fbd.ShowDialog($setupModal) -eq [System.Windows.Forms.DialogResult]::OK) {
             $txtDest.Text = $fbd.SelectedPath
         }
     })
-    
-    $lblNotice = New-Object System.Windows.Forms.Label
-    $lblNotice.Text = "Configuracao salva no evento. Proximas insercoes deste mesmo cartao serao automaticas!"
-    $lblNotice.Font = $fontSmall
-    $lblNotice.ForeColor = $colorGreen
-    $lblNotice.Location = New-Object System.Drawing.Point(0, 215)
-    $lblNotice.AutoSize = $true
-    $pnlBody.Controls.Add($lblNotice)
-    
-    # Rodape
-    $pnlFooter = New-Object System.Windows.Forms.Panel
-    $pnlFooter.Dock = [System.Windows.Forms.DockStyle]::Bottom
-    $pnlFooter.Height = 60
-    $pnlFooter.Padding = New-Object System.Windows.Forms.Padding(20, 10, 20, 10)
-    $setupModal.Controls.Add($pnlFooter)
-    
-    $btnCancelModal = New-Object System.Windows.Forms.Button
-    $btnCancelModal.Text = "Cancelar"
-    $btnCancelModal.Font = $fontRegular
-    $btnCancelModal.BackColor = $colorElevated
-    $btnCancelModal.ForeColor = $colorText
-    $btnCancelModal.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $btnCancelModal.Location = New-Object System.Drawing.Point(355, 14)
-    $btnCancelModal.Size = New-Object System.Drawing.Size(110, 36)
-    $pnlFooter.Controls.Add($btnCancelModal)
-    
-    $btnSave = New-Object System.Windows.Forms.Button
-    $btnSave.Text = if ($isEditMode) { "Salvar Alteracoes" } else { "Salvar e Iniciar Ingestao" }
-    $btnSave.Font = $fontBold
-    $btnSave.BackColor = $colorGreen
-    $btnSave.ForeColor = [System.Drawing.Color]::Black
-    $btnSave.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $btnSave.Location = New-Object System.Drawing.Point(475, 14)
-    $btnSave.Size = New-Object System.Drawing.Size(130, 36)
-    $pnlFooter.Controls.Add($btnSave)
-    
+
+    # ----- Rodape
+    $footer = New-ModalFooter
+    $saveText = if ($isEditMode) { "Salvar alterações" } else { "Salvar e iniciar descarga" }
+    $btnSave = New-Btn $saveText 'success' 220 42
+    $btnCancelModal = New-Btn "Cancelar" 'secondary' 110 42
+    $btnCancelModal.Margin = New-Object System.Windows.Forms.Padding(10, 0, 0, 0)
+    $footer.Controls.Add($btnSave)
+    $footer.Controls.Add($btnCancelModal)
+    $root.Controls.Add($footer, 0, 2)
+    $setupModal.AcceptButton = $btnSave
+    $setupModal.CancelButton = $btnCancelModal
+
     $btnSave.Add_Click({
         $photogName = $cmbPhotog.Text.Trim()
         $subfPath = $cmbSubf.Text.Trim()
         $destPath = $txtDest.Text.Trim()
-        
+
         if ([string]::IsNullOrWhiteSpace($photogName)) {
-            [System.Windows.Forms.MessageBox]::Show($setupModal, "Informe o nome do fotografo.", "Aviso", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+            [System.Windows.Forms.MessageBox]::Show($setupModal, "Informe o nome do fotógrafo (passo 1).", "Falta um dado", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+            $cmbPhotog.Focus()
             return
         }
         if ([string]::IsNullOrWhiteSpace($destPath)) {
-            [System.Windows.Forms.MessageBox]::Show($setupModal, "Informe a pasta de destino.", "Aviso", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+            [System.Windows.Forms.MessageBox]::Show($setupModal, "Informe a pasta de destino (passo 3).", "Falta um dado", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+            $txtDest.Focus()
             return
         }
-        
+
         if (-not (Test-DriveIsConnected -Path $destPath)) {
-            [System.Windows.Forms.MessageBox]::Show($setupModal, "A unidade de disco para '$destPath' nao esta disponivel ou conectada neste computador! Escolha outra pasta em um disco valido.", "Disco Indisponivel", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+            [System.Windows.Forms.MessageBox]::Show($setupModal, "A unidade de disco para '$destPath' não está disponível ou conectada neste computador!`n`nEscolha outra pasta em um disco válido.", "Disco indisponível", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
             return
         }
-        
+
         if ($subfPath -eq "\ (Raiz do Cartao)") {
             $subfPath = ""
         }
-        
+
         $script:RegisteredResult = Register-CardForEvent -EventName $EventName `
             -CardIdentifier $CardIdentifier `
             -Photographer $photogName `
             -DestinationPath $destPath `
             -PhotoSubfolder $subfPath
-        
+
         $setupModal.DialogResult = [System.Windows.Forms.DialogResult]::OK
         $setupModal.Close()
     })
-    
+
     $btnCancelModal.Add_Click({
         $script:RegisteredResult = $null
         $setupModal.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
         $setupModal.Close()
     })
-    
+
     [void]$setupModal.ShowDialog()
     $setupModal.Dispose()
     return $script:RegisteredResult
@@ -588,231 +936,451 @@ function Show-CardSetupModal {
 # JANELA PRINCIPAL DA APLICACAO
 # -----------------------------------------------------------------------------
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "Estacao de Ingestao DIT - Backup Seguro de Alta Confiabilidade"
-$form.Size = New-Object System.Drawing.Size(1100, 780)
-$form.MinimumSize = New-Object System.Drawing.Size(980, 680)
+$form.Text = "Estação de Ingestão DIT - Backup Seguro"
+$form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::Dpi
+$form.AutoScaleDimensions = New-Object System.Drawing.SizeF(96, 96)
+$form.ClientSize = New-Object System.Drawing.Size(1220, 800)
+$form.MinimumSize = New-Object System.Drawing.Size(1060, 720)
 $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
 $form.BackColor = $colorBg
 $form.ForeColor = $colorText
 $form.Font = $fontRegular
+Enable-DoubleBuffer $form
 
-# CORPO PRINCIPAL COM DUAS COLUNAS (ADICIONADO PRIMEIRO PARA DOCK=FILL)
-$mainContainer = New-Object System.Windows.Forms.SplitContainer
-$mainContainer.Dock = [System.Windows.Forms.DockStyle]::Fill
-$mainContainer.BackColor = $colorBg
-$mainContainer.SplitterWidth = 8
-$mainContainer.SplitterDistance = 640
-# skipped min
-try { $mainContainer.SplitterDistance = 640 } catch {}
-$form.Add_Resize({
-    try {
-        Adjust-CardsGridColumns
-        Adjust-HistoryGridColumns
-    } catch {} try { if ($form.ClientSize.Width -gt 800) { $mainContainer.SplitterDistance = [math]::Max(450, [int]($form.ClientSize.Width * 0.60)) } } catch {} })
-$form.Controls.Add($mainContainer)
+$root = New-Table 1 5
+$root.Padding = New-Object System.Windows.Forms.Padding(28, 18, 28, 22)
+Add-ColStyle $root 'pct' 100
+Add-RowStyle $root 'abs' 68      # cabecalho
+Add-RowStyle $root 'auto'        # aviso de disco
+Add-RowStyle $root 'abs' 160     # painel de status
+Add-RowStyle $root 'pct' 100     # corpo
+Add-RowStyle $root 'abs' 118     # rodape
+$form.Controls.Add($root)
 
-# PAINEL DE STATUS & PROGRESSO DE INGESTAO (DOCK=TOP)
-$pnlProgress = New-Object System.Windows.Forms.Panel
-$pnlProgress.Dock = [System.Windows.Forms.DockStyle]::Top
-$pnlProgress.Height = 100
-$pnlProgress.BackColor = $colorSurface
-$pnlProgress.Padding = New-Object System.Windows.Forms.Padding(20, 10, 20, 10)
-$form.Controls.Add($pnlProgress)
+# ----- CABECALHO
+$headerPanel = New-Table 5 1
+Add-ColStyle $headerPanel 'abs' 62
+Add-ColStyle $headerPanel 'pct' 100
+Add-ColStyle $headerPanel 'auto'
+Add-ColStyle $headerPanel 'auto'
+Add-ColStyle $headerPanel 'auto'
+Add-RowStyle $headerPanel 'pct' 100
+$root.Controls.Add($headerPanel, 0, 0)
+
+$logo = New-Object System.Windows.Forms.Panel
+$logo.Size = New-Object System.Drawing.Size(46, 46)
+$logo.Anchor = [System.Windows.Forms.AnchorStyles]::Left
+$logo.BackColor = $colorBg
+$logo.Margin = New-Object System.Windows.Forms.Padding(0)
+$logo.Add_Paint({
+    param($s, $e)
+    $g = $e.Graphics
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $rect = New-Object System.Drawing.Rectangle(0, 0, ($s.Width - 1), ($s.Height - 1))
+    $path = New-RoundedPath $rect (Px 12)
+    $grad = New-Object System.Drawing.Drawing2D.LinearGradientBrush($rect, (New-Rgb 6 182 212), (New-Rgb 59 130 246), 45.0)
+    $g.FillPath($grad, $path)
+    $grad.Dispose(); $path.Dispose()
+    $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 2.2)
+    $cx = $s.Width / 2.0; $cy = $s.Height / 2.0 + 1
+    $bodyRect = New-Object System.Drawing.RectangleF(($cx - 12), ($cy - 8), 24, 17)
+    $g.DrawRectangle($pen, [int]$bodyRect.X, [int]$bodyRect.Y, [int]$bodyRect.Width, [int]$bodyRect.Height)
+    $g.DrawEllipse($pen, ($cx - 5), ($cy - 5), 10, 10)
+    $g.DrawLine($pen, ($cx - 5), ($cy - 8), ($cx - 3), ($cy - 12))
+    $g.DrawLine($pen, ($cx - 3), ($cy - 12), ($cx + 3), ($cy - 12))
+    $g.DrawLine($pen, ($cx + 3), ($cy - 12), ($cx + 5), ($cy - 8))
+    $pen.Dispose()
+})
+$headerPanel.Controls.Add($logo, 0, 0)
+
+$titleFlow = New-Object System.Windows.Forms.FlowLayoutPanel
+$titleFlow.FlowDirection = [System.Windows.Forms.FlowDirection]::TopDown
+$titleFlow.WrapContents = $false
+$titleFlow.AutoSize = $true
+$titleFlow.Anchor = [System.Windows.Forms.AnchorStyles]::Left
+$titleFlow.BackColor = [System.Drawing.Color]::Transparent
+$titleFlow.Margin = New-Object System.Windows.Forms.Padding(0)
+$lblBrand = New-Lbl "Estação de Ingestão DIT" $fontHero $colorText
+$lblSub = New-Lbl "Backup fotográfico automático, verificado byte a byte (SHA-256)" $fontSmall $colorMuted
+$titleFlow.Controls.Add($lblBrand)
+$titleFlow.Controls.Add($lblSub)
+$headerPanel.Controls.Add($titleFlow, 1, 0)
+
+$lblEventCaption = New-Lbl "EVENTO ATIVO" $fontCaps $colorDim
+$lblEventCaption.Anchor = [System.Windows.Forms.AnchorStyles]::Right
+$lblEventCaption.Margin = New-Object System.Windows.Forms.Padding(0, 0, 10, 0)
+$headerPanel.Controls.Add($lblEventCaption, 2, 0)
+
+$lblActiveEventBadge = New-Object System.Windows.Forms.Label
+$lblActiveEventBadge.Text = $script:CurrentEvent
+$lblActiveEventBadge.Font = $fontBold
+$lblActiveEventBadge.ForeColor = $colorCyan
+$lblActiveEventBadge.BackColor = (Get-Blend $colorCyan $colorBg 0.14)
+$lblActiveEventBadge.AutoSize = $true
+$lblActiveEventBadge.Padding = New-Object System.Windows.Forms.Padding(14, 8, 14, 8)
+$lblActiveEventBadge.Anchor = [System.Windows.Forms.AnchorStyles]::Right
+$lblActiveEventBadge.Margin = New-Object System.Windows.Forms.Padding(0, 0, 12, 0)
+$headerPanel.Controls.Add($lblActiveEventBadge, 3, 0)
+
+$btnSwitchEvent = New-Btn "Trocar / novo evento" 'secondary' 170 38
+$btnSwitchEvent.Anchor = [System.Windows.Forms.AnchorStyles]::Right
+$headerPanel.Controls.Add($btnSwitchEvent, 4, 0)
+
+# ----- AVISO DE UNIDADE DESCONECTADA
+$bannerWarning = New-Object System.Windows.Forms.Panel
+$bannerWarning.Dock = [System.Windows.Forms.DockStyle]::Fill
+$bannerWarning.Height = 50
+$bannerWarning.BackColor = (Get-Blend $colorAmber $colorBg 0.13)
+$bannerWarning.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 14)
+$bannerWarning.Visible = $false
+
+$lblWarningText = New-Object System.Windows.Forms.Label
+$lblWarningText.Text = ""
+$lblWarningText.Font = $fontBold
+$lblWarningText.ForeColor = $colorAmber
+$lblWarningText.Dock = [System.Windows.Forms.DockStyle]::Fill
+$lblWarningText.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+$lblWarningText.AutoEllipsis = $true
+$lblWarningText.Padding = New-Object System.Windows.Forms.Padding(16, 0, 8, 0)
+$bannerWarning.Controls.Add($lblWarningText)
+
+$btnFixStorage = New-Btn "Escolher outro disco..." 'warning' 210 50
+$btnFixStorage.Dock = [System.Windows.Forms.DockStyle]::Right
+$bannerWarning.Controls.Add($btnFixStorage)
+$root.Controls.Add($bannerWarning, 0, 1)
+
+# ----- PAINEL DE STATUS & PROGRESSO
+$pnlProgress = New-CardPanel
+$pnlProgress.Dock = [System.Windows.Forms.DockStyle]::Fill
+$pnlProgress.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 16)
+$pnlProgress.Padding = New-Object System.Windows.Forms.Padding(28, 16, 22, 14)
+$pnlProgress.Add_Paint({
+    param($s, $e)
+    $accent = New-Object System.Drawing.SolidBrush($script:StatusColor)
+    $e.Graphics.FillRectangle($accent, (Px 1), (Px 16), (Px 4), ($s.Height - (Px 32)))
+    $accent.Dispose()
+})
+$root.Controls.Add($pnlProgress, 0, 2)
+
+$heroGrid = New-Table 2 3
+Add-ColStyle $heroGrid 'pct' 100
+Add-ColStyle $heroGrid 'abs' 220
+Add-RowStyle $heroGrid 'abs' 46
+Add-RowStyle $heroGrid 'abs' 44
+Add-RowStyle $heroGrid 'abs' 32
+$pnlProgress.Controls.Add($heroGrid)
+
+# linha 0: selo de estado + detalhe | estado da leitura
+$rowStatus = New-Table 2 1
+Add-ColStyle $rowStatus 'auto'
+Add-ColStyle $rowStatus 'pct' 100
+Add-RowStyle $rowStatus 'pct' 100
 
 $lblBadge = New-Object System.Windows.Forms.Label
 $lblBadge.Text = "SISTEMA ARMADO"
-$lblBadge.Font = $fontBold
+$lblBadge.Font = $fontCaps
+$lblBadge.AutoSize = $true
+$lblBadge.Padding = New-Object System.Windows.Forms.Padding(12, 7, 12, 7)
+$lblBadge.Anchor = [System.Windows.Forms.AnchorStyles]::Left
+$lblBadge.Margin = New-Object System.Windows.Forms.Padding(0, 0, 14, 0)
 $lblBadge.ForeColor = $colorGreen
-$lblBadge.BackColor = [System.Drawing.Color]::FromArgb(30, 16, 185, 129)
-$lblBadge.Location = New-Object System.Drawing.Point(20, 10)
-$lblBadge.Size = New-Object System.Drawing.Size(180, 26)
-$lblBadge.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
-$pnlProgress.Controls.Add($lblBadge)
+$lblBadge.BackColor = (Get-Blend $colorGreen $colorSurface 0.16)
+$rowStatus.Controls.Add($lblBadge, 0, 0)
 
 $lblStatusDetail = New-Object System.Windows.Forms.Label
-$lblStatusDetail.Text = "Aguardando conexao de cartoes ou disparo manual..."
-$lblStatusDetail.Font = $fontRegular
-$lblStatusDetail.ForeColor = $colorMuted
-$lblStatusDetail.Location = New-Object System.Drawing.Point(215, 14)
-$lblStatusDetail.Size = New-Object System.Drawing.Size(650, 20)
-$lblStatusDetail.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
-$pnlProgress.Controls.Add($lblStatusDetail)
+$lblStatusDetail.Text = "Plugue um cartão de memória: o backup começa sozinho."
+$lblStatusDetail.Font = $fontSubTitle
+$lblStatusDetail.ForeColor = $colorText
+$lblStatusDetail.Dock = [System.Windows.Forms.DockStyle]::Fill
+$lblStatusDetail.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+$lblStatusDetail.AutoEllipsis = $true
+$lblStatusDetail.BackColor = [System.Drawing.Color]::Transparent
+$rowStatus.Controls.Add($lblStatusDetail, 1, 0)
+$heroGrid.Controls.Add($rowStatus, 0, 0)
 
-$btnCancel = New-Object System.Windows.Forms.Button
-$btnCancel.Text = "Parar com Seguranca"
-$btnCancel.Font = $fontBold
-$btnCancel.BackColor = [System.Drawing.Color]::FromArgb(40, 245, 158, 11)
-$btnCancel.ForeColor = $colorAmber
-$btnCancel.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$btnCancel.Location = New-Object System.Drawing.Point(880, 8)
-$btnCancel.Size = New-Object System.Drawing.Size(180, 30)
-$btnCancel.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Right
+$lblMonitorState = New-Object System.Windows.Forms.Label
+$lblMonitorState.Text = "Leitura automática ligada"
+$lblMonitorState.Font = $fontSmall
+$lblMonitorState.ForeColor = $colorGreen
+$lblMonitorState.Dock = [System.Windows.Forms.DockStyle]::Fill
+$lblMonitorState.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
+$lblMonitorState.BackColor = [System.Drawing.Color]::Transparent
+$heroGrid.Controls.Add($lblMonitorState, 1, 0)
+
+# linha 1: barra de progresso | parar
+$pnlTrack = New-Object System.Windows.Forms.Panel
+$pnlTrack.Height = 12
+$pnlTrack.Anchor = [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
+$pnlTrack.Margin = New-Object System.Windows.Forms.Padding(0, 0, 20, 0)
+$pnlTrack.BackColor = $colorSurface
+Enable-DoubleBuffer $pnlTrack
+$pnlTrack.Add_Resize({ param($s, $e) $s.Invalidate() })
+$pnlTrack.Add_Paint({
+    param($s, $e)
+    $g = $e.Graphics
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $h = $s.Height
+    $trackRect = New-Object System.Drawing.Rectangle(0, 0, ($s.Width - 1), ($h - 1))
+    $tp = New-RoundedPath $trackRect ([int]($h / 2))
+    $g.FillPath($brushElev, $tp)
+    $tp.Dispose()
+    $w = [int](($s.Width - 1) * $script:ProgressPct / 100)
+    if ($script:ProgressPct -gt 0 -and $w -lt $h) { $w = $h }
+    if ($w -gt 0) {
+        $fillRect = New-Object System.Drawing.Rectangle(0, 0, $w, ($h - 1))
+        $fp = New-RoundedPath $fillRect ([int]($h / 2))
+        $gb = New-Object System.Drawing.Drawing2D.LinearGradientBrush($fillRect, $colorCyanBtn, $colorGreen, 0.0)
+        $g.FillPath($gb, $fp)
+        $gb.Dispose(); $fp.Dispose()
+    }
+})
+$heroGrid.Controls.Add($pnlTrack, 0, 1)
+
+$btnCancel = New-Btn "Parar com segurança" 'warning' 200 36
+$btnCancel.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnCancel.Margin = New-Object System.Windows.Forms.Padding(0, 3, 0, 3)
 $btnCancel.Enabled = $false
-$pnlProgress.Controls.Add($btnCancel)
+$heroGrid.Controls.Add($btnCancel, 1, 1)
 
-$progressBar = New-Object System.Windows.Forms.ProgressBar
-$progressBar.Location = New-Object System.Drawing.Point(20, 44)
-$progressBar.Size = New-Object System.Drawing.Size(1040, 18)
-$progressBar.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
-$progressBar.Value = 0
-$pnlProgress.Controls.Add($progressBar)
+# linha 2: metricas | pausar leitura
+$rowMetrics = New-Table 2 1
+Add-ColStyle $rowMetrics 'auto'
+Add-ColStyle $rowMetrics 'pct' 100
+Add-RowStyle $rowMetrics 'pct' 100
 
 $lblProgressMetrics = New-Object System.Windows.Forms.Label
-$lblProgressMetrics.Text = "0 / 0 fotos (0%)"
+$lblProgressMetrics.Text = "Nenhuma descarga em andamento"
 $lblProgressMetrics.Font = $fontMono
 $lblProgressMetrics.ForeColor = $colorMuted
-$lblProgressMetrics.Location = New-Object System.Drawing.Point(20, 68)
 $lblProgressMetrics.AutoSize = $true
-$pnlProgress.Controls.Add($lblProgressMetrics)
+$lblProgressMetrics.Anchor = [System.Windows.Forms.AnchorStyles]::Left
+$lblProgressMetrics.Margin = New-Object System.Windows.Forms.Padding(0, 0, 18, 0)
+$lblProgressMetrics.BackColor = [System.Drawing.Color]::Transparent
+$rowMetrics.Controls.Add($lblProgressMetrics, 0, 0)
 
 $lblFileDetail = New-Object System.Windows.Forms.Label
 $lblFileDetail.Text = ""
 $lblFileDetail.Font = $fontMono
 $lblFileDetail.ForeColor = $colorCyan
-$lblFileDetail.Location = New-Object System.Drawing.Point(260, 68)
-$lblFileDetail.Size = New-Object System.Drawing.Size(800, 20)
-$lblFileDetail.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
-$pnlProgress.Controls.Add($lblFileDetail)
+$lblFileDetail.Dock = [System.Windows.Forms.DockStyle]::Fill
+$lblFileDetail.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+$lblFileDetail.AutoEllipsis = $true
+$lblFileDetail.BackColor = [System.Drawing.Color]::Transparent
+$rowMetrics.Controls.Add($lblFileDetail, 1, 0)
+$heroGrid.Controls.Add($rowMetrics, 0, 2)
 
-# BANNER DE AVISO DE UNIDADE DESCONECTADA (DOCK=TOP)
-$bannerWarning = New-Object System.Windows.Forms.Panel
-$bannerWarning.Dock = [System.Windows.Forms.DockStyle]::Top
-$bannerWarning.Height = 36
-$bannerWarning.BackColor = [System.Drawing.Color]::FromArgb(50, 40, 15)
-$bannerWarning.Visible = $false
-$bannerWarning.Padding = New-Object System.Windows.Forms.Padding(20, 6, 20, 6)
-$form.Controls.Add($bannerWarning)
+$btnToggleMonitor = New-Btn "Pausar leitura" 'ghost' 200 28 $false
+$btnToggleMonitor.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnToggleMonitor.Margin = New-Object System.Windows.Forms.Padding(0, 2, 0, 0)
+$btnToggleMonitor.FlatAppearance.BorderSize = 1
+$btnToggleMonitor.FlatAppearance.BorderColor = $colorBorder
+$heroGrid.Controls.Add($btnToggleMonitor, 1, 2)
 
-$lblWarningText = New-Object System.Windows.Forms.Label
-$lblWarningText.Text = "ATENCAO: A unidade de armazenamento configurada nao esta conectada! Clique ao lado para selecionar um disco valido."
-$lblWarningText.Font = $fontBold
-$lblWarningText.ForeColor = $colorAmber
-$lblWarningText.Location = New-Object System.Drawing.Point(20, 8)
-$lblWarningText.AutoSize = $true
-$bannerWarning.Controls.Add($lblWarningText)
+# ----- CORPO: CARTOES (ESQUERDA) | HISTORICO (DIREITA)
+$bodyGrid = New-Table 3 1
+Add-ColStyle $bodyGrid 'pct' 58
+Add-ColStyle $bodyGrid 'abs' 16
+Add-ColStyle $bodyGrid 'pct' 42
+Add-RowStyle $bodyGrid 'pct' 100
+$root.Controls.Add($bodyGrid, 0, 3)
 
-$btnFixStorage = New-Object System.Windows.Forms.Button
-$btnFixStorage.Text = "Selecionar Disco Valido..."
-$btnFixStorage.Font = $fontBold
-$btnFixStorage.BackColor = $colorAmber
-$btnFixStorage.ForeColor = [System.Drawing.Color]::Black
-$btnFixStorage.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$btnFixStorage.Location = New-Object System.Drawing.Point(850, 4)
-$btnFixStorage.Size = New-Object System.Drawing.Size(210, 26)
-$btnFixStorage.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Right
-$bannerWarning.Controls.Add($btnFixStorage)
+# --- Cartao esquerdo
+$pnlLeftCards = New-CardPanel
+$pnlLeftCards.Dock = [System.Windows.Forms.DockStyle]::Fill
+$leftGrid = New-Table 1 3
+Add-ColStyle $leftGrid 'pct' 100
+Add-RowStyle $leftGrid 'abs' 44
+Add-RowStyle $leftGrid 'pct' 100
+Add-RowStyle $leftGrid 'abs' 54
+$pnlLeftCards.Controls.Add($leftGrid)
+$bodyGrid.Controls.Add($pnlLeftCards, 0, 0)
 
-# BARRA DE CONTROLE: MONITORAMENTO & DESTINO DE ARMAZENAMENTO (DOCK=TOP)
-$monitorBar = New-Object System.Windows.Forms.Panel
-$monitorBar.Dock = [System.Windows.Forms.DockStyle]::Top
-$monitorBar.Height = 50
-$monitorBar.BackColor = [System.Drawing.Color]::FromArgb(18, 30, 49)
-$monitorBar.Padding = New-Object System.Windows.Forms.Padding(20, 8, 20, 8)
-$form.Controls.Add($monitorBar)
+$cardsHead = New-Table 2 1
+Add-ColStyle $cardsHead 'pct' 100
+Add-ColStyle $cardsHead 'auto'
+Add-RowStyle $cardsHead 'pct' 100
+$lblCardsTitle = New-Lbl "Cartões deste evento" $fontSubTitle $colorText
+$lblCardsTitle.Anchor = [System.Windows.Forms.AnchorStyles]::Left
+$cardsHead.Controls.Add($lblCardsTitle, 0, 0)
+$btnAddCardManual = New-Btn "+ Cadastrar cartão" 'primary' 168 34
+$btnAddCardManual.Anchor = [System.Windows.Forms.AnchorStyles]::Right
+$cardsHead.Controls.Add($btnAddCardManual, 1, 0)
+$leftGrid.Controls.Add($cardsHead, 0, 0)
 
-$lblMonitorState = New-Object System.Windows.Forms.Label
-$lblMonitorState.Text = "MONITORAMENTO ATIVO - Leitura Automatica Ligada"
-$lblMonitorState.Font = $fontBold
-$lblMonitorState.ForeColor = $colorGreen
-$lblMonitorState.Location = New-Object System.Drawing.Point(20, 15)
-$lblMonitorState.AutoSize = $true
-$monitorBar.Controls.Add($lblMonitorState)
+$pnlCardsHost = New-Object System.Windows.Forms.Panel
+$pnlCardsHost.Dock = [System.Windows.Forms.DockStyle]::Fill
+$pnlCardsHost.BackColor = $colorSurface
+$pnlCardsHost.Margin = New-Object System.Windows.Forms.Padding(0)
+$leftGrid.Controls.Add($pnlCardsHost, 0, 1)
 
-$btnToggleMonitor = New-Object System.Windows.Forms.Button
-$btnToggleMonitor.Text = "Pausar Leitura"
-$btnToggleMonitor.Font = $fontBold
-$btnToggleMonitor.BackColor = [System.Drawing.Color]::FromArgb(40, 245, 158, 11)
-$btnToggleMonitor.ForeColor = $colorAmber
-$btnToggleMonitor.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$btnToggleMonitor.Location = New-Object System.Drawing.Point(380, 10)
-$btnToggleMonitor.Size = New-Object System.Drawing.Size(160, 30)
-$monitorBar.Controls.Add($btnToggleMonitor)
+$gridEventCards = New-Object System.Windows.Forms.ListView
+Initialize-DarkList -List $gridEventCards -RowHeight 44
+[void]$gridEventCards.Columns.Add("CARTÃO", (Px 130))
+[void]$gridEventCards.Columns.Add("FOTÓGRAFO", (Px 150))
+[void]$gridEventCards.Columns.Add("PASTA NA CÂMERA", (Px 140))
+[void]$gridEventCards.Columns.Add("SALVO EM", (Px 220))
+$pnlCardsHost.Controls.Add($gridEventCards)
 
-$lblStorageTitle = New-Object System.Windows.Forms.Label
-$lblStorageTitle.Text = "Destino do Evento:"
-$lblStorageTitle.Font = $fontBold
-$lblStorageTitle.ForeColor = $colorMuted
-$lblStorageTitle.Location = New-Object System.Drawing.Point(560, 15)
-$lblStorageTitle.AutoSize = $true
-$monitorBar.Controls.Add($lblStorageTitle)
+$lblCardsEmpty = New-EmptyHint "Nenhum cartão cadastrado neste evento ainda.`n`nPlugue um cartão de memória: ele é reconhecido na hora e o cadastro (fotógrafo e pasta) é pedido uma única vez. Nas próximas inserções a descarga é 100% automática."
+$pnlCardsHost.Controls.Add($lblCardsEmpty)
+$lblCardsEmpty.BringToFront()
 
+$cardActions = New-Object System.Windows.Forms.FlowLayoutPanel
+$cardActions.Dock = [System.Windows.Forms.DockStyle]::Fill
+$cardActions.FlowDirection = [System.Windows.Forms.FlowDirection]::RightToLeft
+$cardActions.WrapContents = $false
+$cardActions.BackColor = [System.Drawing.Color]::Transparent
+$cardActions.Padding = New-Object System.Windows.Forms.Padding(0, 14, 0, 0)
+$btnRemoveCard = New-Btn "Excluir cadastro" 'danger' 150 36 $false
+$btnEditCard = New-Btn "Editar cadastro" 'secondary' 150 36 $false
+$btnEditCard.Margin = New-Object System.Windows.Forms.Padding(10, 0, 0, 0)
+$btnEditCard.Enabled = $false
+$btnRemoveCard.Enabled = $false
+$cardActions.Controls.Add($btnRemoveCard)
+$cardActions.Controls.Add($btnEditCard)
+$leftGrid.Controls.Add($cardActions, 0, 2)
+
+# --- Cartao direito: historico
+$pnlRightHist = New-CardPanel
+$pnlRightHist.Dock = [System.Windows.Forms.DockStyle]::Fill
+$rightGrid = New-Table 1 2
+Add-ColStyle $rightGrid 'pct' 100
+Add-RowStyle $rightGrid 'abs' 44
+Add-RowStyle $rightGrid 'pct' 100
+$pnlRightHist.Controls.Add($rightGrid)
+$bodyGrid.Controls.Add($pnlRightHist, 2, 0)
+
+$lblHistColTitle = New-Lbl "Histórico de descargas" $fontSubTitle $colorText
+$lblHistColTitle.Anchor = [System.Windows.Forms.AnchorStyles]::Left
+$rightGrid.Controls.Add($lblHistColTitle, 0, 0)
+
+$pnlHistHost = New-Object System.Windows.Forms.Panel
+$pnlHistHost.Dock = [System.Windows.Forms.DockStyle]::Fill
+$pnlHistHost.BackColor = $colorSurface
+$pnlHistHost.Margin = New-Object System.Windows.Forms.Padding(0)
+$rightGrid.Controls.Add($pnlHistHost, 0, 1)
+
+$gridHistory = New-Object System.Windows.Forms.ListView
+Initialize-DarkList -List $gridHistory -RowHeight 44
+[void]$gridHistory.Columns.Add("HORA", (Px 78))
+[void]$gridHistory.Columns.Add("FOTÓGRAFO / CARTÃO", (Px 180))
+[void]$gridHistory.Columns.Add("FOTOS", (Px 90))
+[void]$gridHistory.Columns.Add("VOLUME", (Px 90))
+[void]$gridHistory.Columns.Add("STATUS", (Px 130))
+$pnlHistHost.Controls.Add($gridHistory)
+
+$lblHistEmpty = New-EmptyHint "As descargas feitas neste evento aparecem aqui, com horário, quantidade de fotos e situação."
+$pnlHistHost.Controls.Add($lblHistEmpty)
+$lblHistEmpty.BringToFront()
+
+# ----- RODAPE: DESTINO | DESCARGA MANUAL
+$pnlFooter = New-CardPanel
+$pnlFooter.Dock = [System.Windows.Forms.DockStyle]::Fill
+$pnlFooter.Margin = New-Object System.Windows.Forms.Padding(0, 16, 0, 0)
+$pnlFooter.Padding = New-Object System.Windows.Forms.Padding(22, 14, 22, 12)
+$root.Controls.Add($pnlFooter, 0, 4)
+
+$footGrid = New-Table 3 1
+Add-ColStyle $footGrid 'pct' 46
+Add-ColStyle $footGrid 'abs' 30
+Add-ColStyle $footGrid 'pct' 54
+Add-RowStyle $footGrid 'pct' 100
+$pnlFooter.Controls.Add($footGrid)
+
+# destino
+$destGrid = New-Table 1 2
+Add-ColStyle $destGrid 'pct' 100
+Add-RowStyle $destGrid 'abs' 22
+Add-RowStyle $destGrid 'pct' 100
+$lblStorageTitle = New-Lbl "DESTINO DO EVENTO" $fontCaps $colorDim
+$destGrid.Controls.Add($lblStorageTitle, 0, 0)
+
+$destRow = New-Table 2 1
+Add-ColStyle $destRow 'pct' 100
+Add-ColStyle $destRow 'abs' 130
+Add-RowStyle $destRow 'pct' 100
 $lblStoragePath = New-Object System.Windows.Forms.Label
 $lblStoragePath.Font = $fontMono
 $lblStoragePath.ForeColor = $colorCyan
-$lblStoragePath.Location = New-Object System.Drawing.Point(680, 15)
-$lblStoragePath.Size = New-Object System.Drawing.Size(260, 20)
-$lblStoragePath.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
-$monitorBar.Controls.Add($lblStoragePath)
+$lblStoragePath.Dock = [System.Windows.Forms.DockStyle]::Fill
+$lblStoragePath.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+$lblStoragePath.AutoEllipsis = $true
+$lblStoragePath.BackColor = [System.Drawing.Color]::Transparent
+$destRow.Controls.Add($lblStoragePath, 0, 0)
+$btnChangeStorage = New-Btn "Alterar pasta..." 'secondary' 120 38 $false
+$btnChangeStorage.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnChangeStorage.Margin = New-Object System.Windows.Forms.Padding(8, 4, 0, 4)
+$destRow.Controls.Add($btnChangeStorage, 1, 0)
+$destGrid.Controls.Add($destRow, 0, 1)
+$footGrid.Controls.Add($destGrid, 0, 0)
 
-$btnChangeStorage = New-Object System.Windows.Forms.Button
-$btnChangeStorage.Text = "Alterar Pasta..."
-$btnChangeStorage.Font = $fontRegular
-$btnChangeStorage.BackColor = $colorElevated
-$btnChangeStorage.ForeColor = $colorText
-$btnChangeStorage.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$btnChangeStorage.Location = New-Object System.Drawing.Point(950, 10)
-$btnChangeStorage.Size = New-Object System.Drawing.Size(110, 30)
-$btnChangeStorage.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Right
-$monitorBar.Controls.Add($btnChangeStorage)
+# descarga manual
+$manualGrid = New-Table 1 2
+Add-ColStyle $manualGrid 'pct' 100
+Add-RowStyle $manualGrid 'abs' 22
+Add-RowStyle $manualGrid 'pct' 100
+$lblManualTitle = New-Lbl "DESCARGA MANUAL (CARTÃO JÁ CONECTADO)" $fontCaps $colorDim
+$manualGrid.Controls.Add($lblManualTitle, 0, 0)
 
-# BARRA SUPERIOR (HEADER) (DOCK=TOP - ADICIONADO POR ULTIMO FICA NO TOPO EXTREMO)
-$headerPanel = New-Object System.Windows.Forms.Panel
-$headerPanel.Dock = [System.Windows.Forms.DockStyle]::Top
-$headerPanel.Height = 65
-$headerPanel.BackColor = $colorSurface
-$headerPanel.Padding = New-Object System.Windows.Forms.Padding(20, 10, 20, 10)
-$form.Controls.Add($headerPanel)
-
-$lblBrand = New-Object System.Windows.Forms.Label
-$lblBrand.Text = "ESTACAO DE INGESTAO DIT"
-$lblBrand.Font = $fontTitle
-$lblBrand.ForeColor = $colorCyan
-$lblBrand.Location = New-Object System.Drawing.Point(20, 12)
-$lblBrand.AutoSize = $true
-$headerPanel.Controls.Add($lblBrand)
-
-$lblSub = New-Object System.Windows.Forms.Label
-$lblSub.Text = "Backup Fotografico Automatizado com SHA-256 e Ejecao Segura"
-$lblSub.Font = $fontSmall
-$lblSub.ForeColor = $colorMuted
-$lblSub.Location = New-Object System.Drawing.Point(20, 36)
-$lblSub.AutoSize = $true
-$headerPanel.Controls.Add($lblSub)
-
-$lblActiveEventBadge = New-Object System.Windows.Forms.Label
-$lblActiveEventBadge.Text = "EVENTO: $script:CurrentEvent"
-$lblActiveEventBadge.Font = $fontBold
-$lblActiveEventBadge.ForeColor = $colorCyan
-$lblActiveEventBadge.BackColor = [System.Drawing.Color]::FromArgb(40, 6, 182, 212)
-$lblActiveEventBadge.Location = New-Object System.Drawing.Point(620, 15)
-$lblActiveEventBadge.Size = New-Object System.Drawing.Size(250, 32)
-$lblActiveEventBadge.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
-$lblActiveEventBadge.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Right
-$headerPanel.Controls.Add($lblActiveEventBadge)
-
-$btnSwitchEvent = New-Object System.Windows.Forms.Button
-$btnSwitchEvent.Text = "Trocar / Novo Evento"
-$btnSwitchEvent.Font = $fontBold
-$btnSwitchEvent.BackColor = $colorElevated
-$btnSwitchEvent.ForeColor = $colorText
-$btnSwitchEvent.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$btnSwitchEvent.Location = New-Object System.Drawing.Point(880, 15)
-$btnSwitchEvent.Size = New-Object System.Drawing.Size(180, 32)
-$btnSwitchEvent.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Right
-$headerPanel.Controls.Add($btnSwitchEvent)
+$manualRow = New-Table 3 1
+Add-ColStyle $manualRow 'pct' 100
+Add-ColStyle $manualRow 'abs' 108
+Add-ColStyle $manualRow 'abs' 170
+Add-RowStyle $manualRow 'pct' 100
+$txtSource = New-TextInput -Text "" -Font $fontMono
+$txtSource.Parent.Margin = New-Object System.Windows.Forms.Padding(0, 4, 0, 4)
+$btnBrowseSource = New-Btn "Procurar..." 'secondary' 100 38 $false
+$btnBrowseSource.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnBrowseSource.Margin = New-Object System.Windows.Forms.Padding(8, 4, 0, 4)
+$btnIngestNow = New-Btn "Descarregar agora" 'primary' 160 38
+$btnIngestNow.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnIngestNow.Margin = New-Object System.Windows.Forms.Padding(8, 4, 0, 4)
+$manualRow.Controls.Add($txtSource.Parent, 0, 0)
+$manualRow.Controls.Add($btnBrowseSource, 1, 0)
+$manualRow.Controls.Add($btnIngestNow, 2, 0)
+$manualGrid.Controls.Add($manualRow, 0, 1)
+$footGrid.Controls.Add($manualGrid, 2, 0)
 
 # -----------------------------------------------------------------------------
 # FUNCOES DE ATUALIZACAO DE STATUS E TELA
 # -----------------------------------------------------------------------------
+function Set-AppStatus {
+    param([string]$State, [string]$Badge, [string]$Detail = "")
+    $c = switch ($State) {
+        'busy'   { $colorCyan }
+        'warn'   { $colorAmber }
+        'paused' { $colorAmber }
+        'error'  { $colorRed }
+        default  { $colorGreen }
+    }
+    $script:StatusState = $State
+    $script:StatusColor = $c
+    $lblBadge.Text = $Badge
+    $lblBadge.ForeColor = $c
+    $lblBadge.BackColor = (Get-Blend $c $colorSurface 0.16)
+    if ($Detail) { $lblStatusDetail.Text = $Detail }
+    $pnlProgress.Invalidate()
+}
+
+function Set-Progress {
+    param([int]$Percent)
+    $script:ProgressPct = [math]::Max(0, [math]::Min(100, $Percent))
+    $pnlTrack.Invalidate()
+}
+
+function Set-ActiveEventBadge {
+    $lblActiveEventBadge.Text = $script:CurrentEvent
+}
+
 function Update-StorageUI {
     $ev = Get-CurrentEvent
     $dest = $ev.DefaultDestination
     $lblStoragePath.Text = $dest
-    
+
     if (-not (Test-DriveIsConnected -Path $dest)) {
-        $root = [System.IO.Path]::GetPathRoot($dest)
+        $root2 = [System.IO.Path]::GetPathRoot($dest)
         $bannerWarning.Visible = $true
-        $lblWarningText.Text = "ATENCAO: A unidade '$root' nao esta conectada! Destino salvo sera redirecionado para um disco valido."
+        $lblWarningText.Text = "Atenção: a unidade '$root2' não está conectada. Escolha um disco válido para guardar os backups."
     } else {
         $bannerWarning.Visible = $false
     }
@@ -820,19 +1388,19 @@ function Update-StorageUI {
 
 function Update-MonitoringUI {
     if ($script:MonitoringActive) {
-        $lblMonitorState.Text = "MONITORAMENTO ATIVO - Leitura Automatica Ligada"
+        $lblMonitorState.Text = "Leitura automática ligada"
         $lblMonitorState.ForeColor = $colorGreen
-        $monitorBar.BackColor = [System.Drawing.Color]::FromArgb(15, 35, 30)
-        $btnToggleMonitor.Text = "Pausar Leitura"
-        $btnToggleMonitor.ForeColor = $colorAmber
-        $btnToggleMonitor.BackColor = [System.Drawing.Color]::FromArgb(40, 245, 158, 11)
+        $btnToggleMonitor.Text = "Pausar leitura"
+        if ($script:StatusState -eq 'paused') {
+            Set-AppStatus 'idle' "SISTEMA ARMADO" "Plugue um cartão de memória: o backup começa sozinho."
+        }
     } else {
-        $lblMonitorState.Text = "MONITORAMENTO PAUSADO - Nenhuma Leitura Sera Feita"
+        $lblMonitorState.Text = "Leitura automática pausada"
         $lblMonitorState.ForeColor = $colorAmber
-        $monitorBar.BackColor = [System.Drawing.Color]::FromArgb(40, 30, 15)
-        $btnToggleMonitor.Text = "Retomar Leitura"
-        $btnToggleMonitor.ForeColor = $colorGreen
-        $btnToggleMonitor.BackColor = [System.Drawing.Color]::FromArgb(40, 16, 185, 129)
+        $btnToggleMonitor.Text = "Retomar leitura"
+        if ($script:StatusState -eq 'idle') {
+            Set-AppStatus 'paused' "LEITURA PAUSADA" "Nenhum cartão será lido até você retomar a leitura."
+        }
     }
 }
 
@@ -844,23 +1412,23 @@ $btnToggleMonitor.Add_Click({
 
 $btnChangeStorage.Add_Click({
     $fbd = New-Object System.Windows.Forms.FolderBrowserDialog
-    $fbd.Description = "Selecione a Pasta Onde Salvar os Arquivos do Evento $script:CurrentEvent"
+    $fbd.Description = "Selecione a pasta onde salvar os arquivos do evento $script:CurrentEvent"
     if ($fbd.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
         try {
             Set-EventDestination -EventName $script:CurrentEvent -NewDestination $fbd.SelectedPath -UpdateRegisteredCards $true | Out-Null
             $script:CurrentConfig = Get-StationConfig
             Update-StorageUI
             Refresh-EventCardsGrid
-            [System.Windows.Forms.MessageBox]::Show($form, "Pasta de armazenamento alterada com sucesso!`n`nNovo Destino: $($fbd.SelectedPath)`n`nTodos os cartoes cadastrados foram atualizados.", "Destino Atualizado", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+            [System.Windows.Forms.MessageBox]::Show($form, "Pasta de armazenamento alterada com sucesso!`n`nNovo destino: $($fbd.SelectedPath)`n`nTodos os cartões cadastrados foram atualizados.", "Destino atualizado", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
         } catch {
-            [System.Windows.Forms.MessageBox]::Show($form, "Erro ao alterar pasta de destino: $_", "Erro", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+            [System.Windows.Forms.MessageBox]::Show($form, "Erro ao alterar a pasta de destino: $_", "Erro", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
         }
     }
 })
 
 $btnFixStorage.Add_Click({
     $fbd = New-Object System.Windows.Forms.FolderBrowserDialog
-    $fbd.Description = "Selecione uma Pasta em um Disco Valido para os Backups"
+    $fbd.Description = "Selecione uma pasta em um disco válido para os backups"
     if ($fbd.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
         try {
             Set-EventDestination -EventName $script:CurrentEvent -NewDestination $fbd.SelectedPath -UpdateRegisteredCards $true | Out-Null
@@ -871,209 +1439,89 @@ $btnFixStorage.Add_Click({
     }
 })
 
-# -----------------------------------------------------------------------------
-# COLUNA ESQUERDA: CARTOES CADASTRADOS & DISPARO MANUAL
-# -----------------------------------------------------------------------------
-# 1. Painel Inferior: Disparo Manual (Dock = Bottom para ficar sempre visivel e proporcional)
-$pnlManual = New-Object System.Windows.Forms.Panel
-$pnlManual.Dock = [System.Windows.Forms.DockStyle]::Bottom
-$pnlManual.Height = 140
-$pnlManual.BackColor = $colorSurface
-$pnlManual.Padding = New-Object System.Windows.Forms.Padding(14, 10, 14, 10)
-$mainContainer.Panel1.Controls.Add($pnlManual)
-
-$lblManualTitle = New-Object System.Windows.Forms.Label
-$lblManualTitle.Text = "DESCARREGAR MANUALMENTE (SE JA CONECTADO)"
-$lblManualTitle.Font = $fontSubTitle
-$lblManualTitle.ForeColor = $colorCyan
-$lblManualTitle.Dock = [System.Windows.Forms.DockStyle]::Top
-$lblManualTitle.Height = 22
-$pnlManual.Controls.Add($lblManualTitle)
-
-$lblManualSub = New-Object System.Windows.Forms.Label
-$lblManualSub.Text = "Informe ou selecione a unidade/pasta do cartao fotografico:"
-$lblManualSub.Font = $fontSmall
-$lblManualSub.ForeColor = $colorMuted
-$lblManualSub.Dock = [System.Windows.Forms.DockStyle]::Top
-$lblManualSub.Height = 18
-$pnlManual.Controls.Add($lblManualSub)
-
-$pnlManualInputRow = New-Object System.Windows.Forms.Panel
-$pnlManualInputRow.Dock = [System.Windows.Forms.DockStyle]::Top
-$pnlManualInputRow.Height = 32
-$pnlManualInputRow.Padding = New-Object System.Windows.Forms.Padding(0, 2, 0, 2)
-$pnlManual.Controls.Add($pnlManualInputRow)
-
-$btnBrowseSource = New-Object System.Windows.Forms.Button
-$btnBrowseSource.Text = "Procurar..."
-$btnBrowseSource.Font = $fontRegular
-$btnBrowseSource.BackColor = $colorElevated
-$btnBrowseSource.ForeColor = $colorText
-$btnBrowseSource.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$btnBrowseSource.Dock = [System.Windows.Forms.DockStyle]::Right
-$btnBrowseSource.Width = 95
-$pnlManualInputRow.Controls.Add($btnBrowseSource)
-
-$pnlInputSpacer = New-Object System.Windows.Forms.Panel
-$pnlInputSpacer.Dock = [System.Windows.Forms.DockStyle]::Right
-$pnlInputSpacer.Width = 8
-$pnlManualInputRow.Controls.Add($pnlInputSpacer)
-
-$txtSource = New-Object System.Windows.Forms.TextBox
-$txtSource.Dock = [System.Windows.Forms.DockStyle]::Fill
-$txtSource.BackColor = $colorElevated
-$txtSource.ForeColor = $colorText
-$txtSource.Font = $fontMono
-$pnlManualInputRow.Controls.Add($txtSource)
-
-$pnlBtnSpacer = New-Object System.Windows.Forms.Panel
-$pnlBtnSpacer.Dock = [System.Windows.Forms.DockStyle]::Top
-$pnlBtnSpacer.Height = 6
-$pnlManual.Controls.Add($pnlBtnSpacer)
-
-$btnIngestNow = New-Object System.Windows.Forms.Button
-$btnIngestNow.Text = "Iniciar Ingestao Manual Agora"
-$btnIngestNow.Font = $fontBold
-$btnIngestNow.BackColor = $colorCyan
-$btnIngestNow.ForeColor = [System.Drawing.Color]::Black
-$btnIngestNow.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$btnIngestNow.Dock = [System.Windows.Forms.DockStyle]::Top
-$btnIngestNow.Height = 36
-$pnlManual.Controls.Add($btnIngestNow)
-
 $btnBrowseSource.Add_Click({
     $fbd = New-Object System.Windows.Forms.FolderBrowserDialog
-    $fbd.Description = "Selecione a Unidade ou Pasta do Cartao Fotografico"
+    $fbd.Description = "Selecione a unidade ou pasta do cartão fotográfico"
     if ($fbd.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
         $txtSource.Text = $fbd.SelectedPath
     }
 })
 
-# 2. Painel Superior: Cartoes Cadastrados no Evento (Dock = Fill para aproveitar todo espaco)
-$pnlLeftCards = New-Object System.Windows.Forms.Panel
-$pnlLeftCards.Dock = [System.Windows.Forms.DockStyle]::Fill
-$pnlLeftCards.BackColor = $colorBg
-$pnlLeftCards.Padding = New-Object System.Windows.Forms.Padding(0, 0, 0, 10)
-$mainContainer.Panel1.Controls.Add($pnlLeftCards)
+# -----------------------------------------------------------------------------
+# LISTAS: CARTOES CADASTRADOS E HISTORICO
+# -----------------------------------------------------------------------------
+$gridEventCards.Add_Resize({ param($s, $e) Set-FlexColumn -List $s -Index 3 -Min 140 })
+$gridHistory.Add_Resize({ param($s, $e) Set-FlexColumn -List $s -Index 1 -Min 120 })
 
-$lblCardsTitle = New-Object System.Windows.Forms.Label
-$lblCardsTitle.Text = "CARTOES CADASTRADOS NO EVENTO ATUAL"
-$lblCardsTitle.Font = $fontSubTitle
-$lblCardsTitle.ForeColor = $colorCyan
-$lblCardsTitle.Dock = [System.Windows.Forms.DockStyle]::Top
-$lblCardsTitle.Height = 28
-$pnlLeftCards.Controls.Add($lblCardsTitle)
-
-# Barra de Botoes de Acao do Cartao (Usando TableLayoutPanel responsivo para NUNCA cortar botoes)
-$pnlCardActions = New-Object System.Windows.Forms.TableLayoutPanel
-$pnlCardActions.Dock = [System.Windows.Forms.DockStyle]::Bottom
-$pnlCardActions.Height = 36
-$pnlCardActions.ColumnCount = 3
-$pnlCardActions.RowCount = 1
-[void]$pnlCardActions.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 35)))
-[void]$pnlCardActions.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 30)))
-[void]$pnlCardActions.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 35)))
-[void]$pnlCardActions.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-$pnlLeftCards.Controls.Add($pnlCardActions)
-
-$btnEditCard = New-Object System.Windows.Forms.Button
-$btnEditCard.Text = "Editar Cadastro"
-$btnEditCard.Font = $fontBold
-$btnEditCard.BackColor = $colorCyan
-$btnEditCard.ForeColor = [System.Drawing.Color]::Black
-$btnEditCard.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$btnEditCard.Dock = [System.Windows.Forms.DockStyle]::Fill
-$btnEditCard.Margin = New-Object System.Windows.Forms.Padding(0, 0, 4, 0)
-$pnlCardActions.Controls.Add($btnEditCard, 0, 0)
-
-$btnRemoveCard = New-Object System.Windows.Forms.Button
-$btnRemoveCard.Text = "Excluir Cadastro"
-$btnRemoveCard.Font = $fontRegular
-$btnRemoveCard.BackColor = $colorElevated
-$btnRemoveCard.ForeColor = $colorRed
-$btnRemoveCard.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$btnRemoveCard.Dock = [System.Windows.Forms.DockStyle]::Fill
-$btnRemoveCard.Margin = New-Object System.Windows.Forms.Padding(4, 0, 4, 0)
-$pnlCardActions.Controls.Add($btnRemoveCard, 1, 0)
-
-$btnAddCardManual = New-Object System.Windows.Forms.Button
-$btnAddCardManual.Text = "+ Cadastrar Cartao"
-$btnAddCardManual.Font = $fontRegular
-$btnAddCardManual.BackColor = $colorElevated
-$btnAddCardManual.ForeColor = $colorText
-$btnAddCardManual.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$btnAddCardManual.Dock = [System.Windows.Forms.DockStyle]::Fill
-$btnAddCardManual.Margin = New-Object System.Windows.Forms.Padding(4, 0, 0, 0)
-$pnlCardActions.Controls.Add($btnAddCardManual, 2, 0)
-
-$pnlCardGridSpacer = New-Object System.Windows.Forms.Panel
-$pnlCardGridSpacer.Dock = [System.Windows.Forms.DockStyle]::Bottom
-$pnlCardGridSpacer.Height = 8
-$pnlLeftCards.Controls.Add($pnlCardGridSpacer)
-
-# Grid de Cartoes (GridLines = $false para eliminar linhas fantasmas brancas no fundo escuro!)
-$gridEventCards = New-Object System.Windows.Forms.ListView
-$gridEventCards.Dock = [System.Windows.Forms.DockStyle]::Fill
-$gridEventCards.View = [System.Windows.Forms.View]::Details
-$gridEventCards.FullRowSelect = $true
-$gridEventCards.GridLines = $false
-$gridEventCards.MultiSelect = $false
-$gridEventCards.BackColor = $colorElevated
-$gridEventCards.ForeColor = $colorText
-$gridEventCards.Font = $fontRegular
-$gridEventCards.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-[void]$gridEventCards.Columns.Add("Cartao / ID", 110)
-[void]$gridEventCards.Columns.Add("Fotografo", 120)
-[void]$gridEventCards.Columns.Add("Subpasta Camera", 110)
-[void]$gridEventCards.Columns.Add("Destino dos Arquivos", 220)
-$pnlLeftCards.Controls.Add($gridEventCards)
-
-function Adjust-CardsGridColumns {
-    if ($gridEventCards.Columns.Count -ge 4) {
-        $w = $gridEventCards.ClientSize.Width
-        $rem = $w - (110 + 120 + 110) - 4
-        if ($rem -gt 100) {
-            $gridEventCards.Columns[3].Width = $rem
-        }
-    }
+function Add-CardRow {
+    param([string]$CardId, [string]$Photographer, [string]$Subfolder, [string]$Destination)
+    $item = New-Object System.Windows.Forms.ListViewItem($CardId)
+    $item.UseItemStyleForSubItems = $false
+    $item.Font = $fontBold
+    [void]$item.SubItems.Add($Photographer)
+    $subText = if ($Subfolder) { $Subfolder } else { "\ (raiz)" }
+    [void]$item.SubItems.Add($subText)
+    [void]$item.SubItems.Add($Destination)
+    $item.SubItems[0].ForeColor = $colorText
+    $item.SubItems[1].ForeColor = $colorText
+    $item.SubItems[2].ForeColor = $colorMuted
+    $item.SubItems[3].ForeColor = $colorMuted
+    [void]$gridEventCards.Items.Add($item)
 }
-$gridEventCards.Add_Resize({ Adjust-CardsGridColumns })
+
+function Add-HistoryRow {
+    param([string]$Time, [string]$Who, [string]$Photos, [string]$Volume, [string]$StatusText, $StatusColor)
+    $item = New-Object System.Windows.Forms.ListViewItem($Time)
+    $item.UseItemStyleForSubItems = $false
+    [void]$item.SubItems.Add($Who)
+    [void]$item.SubItems.Add($Photos)
+    [void]$item.SubItems.Add($Volume)
+    [void]$item.SubItems.Add($StatusText)
+    $item.SubItems[0].ForeColor = $colorMuted
+    $item.SubItems[1].ForeColor = $colorText
+    $item.SubItems[2].ForeColor = $colorText
+    $item.SubItems[3].ForeColor = $colorMuted
+    $item.SubItems[4].ForeColor = $StatusColor
+    $item.SubItems[4].Font = $fontBold
+    [void]$gridHistory.Items.Insert(0, $item)
+    $lblHistEmpty.Visible = $false
+}
 
 function Refresh-EventCardsGrid {
     $gridEventCards.Items.Clear()
     $cards = @(Get-EventCards -EventName $script:CurrentEvent)
-    if ($cards.Count -eq 0) {
-        $item = New-Object System.Windows.Forms.ListViewItem("Nenhum cartao cadastrado")
-        [void]$item.SubItems.Add("Insira um cartao para cadastrar")
-        [void]$item.SubItems.Add("Detectado ao plugar")
-        [void]$item.SubItems.Add($lblStoragePath.Text)
-        $item.ForeColor = $colorMuted
-        $gridEventCards.Items.Add($item)
-    } else {
-        foreach ($c in $cards) {
-            $item = New-Object System.Windows.Forms.ListViewItem($c.CardIdentifier)
-            [void]$item.SubItems.Add($c.Photographer)
-            $subText = if ($c.PhotoSubfolder) { $c.PhotoSubfolder } else { "\ (Raiz)" }
-            [void]$item.SubItems.Add($subText)
-            [void]$item.SubItems.Add($c.DestinationPath)
-            $gridEventCards.Items.Add($item)
-        }
+    foreach ($c in $cards) {
+        Add-CardRow -CardId $c.CardIdentifier -Photographer $c.Photographer -Subfolder $c.PhotoSubfolder -Destination $c.DestinationPath
     }
-    Adjust-CardsGridColumns
+    if ($cards.Count -eq 0) {
+        $lblCardsEmpty.Visible = $true
+        $lblCardsEmpty.BringToFront()
+        $lblCardsTitle.Text = "Cartões deste evento"
+    } else {
+        $lblCardsEmpty.Visible = $false
+        $word = if ($cards.Count -eq 1) { "cartão" } else { "cartões" }
+        $lblCardsTitle.Text = "Cartões deste evento  ·  $($cards.Count) $word"
+    }
+    $btnEditCard.Enabled = $false
+    $btnRemoveCard.Enabled = $false
+    Set-FlexColumn -List $gridEventCards -Index 3 -Min 140
 }
+
+$gridEventCards.Add_SelectedIndexChanged({
+    $has = ($gridEventCards.SelectedItems.Count -gt 0)
+    $btnEditCard.Enabled = $has
+    $btnRemoveCard.Enabled = $has
+    $gridEventCards.Invalidate()
+})
 
 # Acao: Editar Cartao Selecionado
 $btnEditCard.Add_Click({
-    if ($gridEventCards.SelectedItems.Count -eq 0) {
-        [System.Windows.Forms.MessageBox]::Show($form, "Selecione um cartao na tabela acima para editar o cadastro.", "Aviso", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
-        return
-    }
+    if ($gridEventCards.SelectedItems.Count -eq 0) { return }
     $selectedId = $gridEventCards.SelectedItems[0].Text
-    if ($selectedId -eq "Nenhum cartao cadastrado") { return }
-    
+
     $cardReg = Get-CardRegistration -EventName $script:CurrentEvent -CardIdentifier $selectedId
     if ($null -eq $cardReg) { return }
-    
+
     # Procura a unidade atual deste cartao se estiver plugado, senao usa C:\
     $currentDrive = "C:\"
     $readyDrives = [System.IO.DriveInfo]::GetDrives() | Where-Object { $_.IsReady }
@@ -1084,29 +1532,25 @@ $btnEditCard.Add_Click({
             break
         }
     }
-    
+
     $res = Show-CardSetupModal -DriveLetter $currentDrive -CardIdentifier $selectedId -EventName $script:CurrentEvent -ExistingRegistration $cardReg
     if ($null -ne $res) {
         $script:CurrentConfig = Get-StationConfig
         Refresh-EventCardsGrid
-        [System.Windows.Forms.MessageBox]::Show($form, "Cadastro do cartao atualizado com sucesso!`n`nFotografo: $($res.Photographer)`nDestino: $($res.DestinationPath)", "Atualizado", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+        [System.Windows.Forms.MessageBox]::Show($form, "Cadastro do cartão atualizado com sucesso!`n`nFotógrafo: $($res.Photographer)`nDestino: $($res.DestinationPath)", "Atualizado", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
     }
 })
 
 $gridEventCards.Add_DoubleClick({
-    $btnEditCard.PerformClick()
+    if ($btnEditCard.Enabled) { $btnEditCard.PerformClick() }
 })
 
 # Acao: Excluir Cartao
 $btnRemoveCard.Add_Click({
-    if ($gridEventCards.SelectedItems.Count -eq 0) {
-        [System.Windows.Forms.MessageBox]::Show($form, "Selecione um cartao para excluir.", "Aviso", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
-        return
-    }
+    if ($gridEventCards.SelectedItems.Count -eq 0) { return }
     $selectedId = $gridEventCards.SelectedItems[0].Text
-    if ($selectedId -eq "Nenhum cartao cadastrado") { return }
-    
-    $confirm = [System.Windows.Forms.MessageBox]::Show($form, "Tem certeza que deseja remover o cadastro do cartao '$selectedId'?`n`nAo plugar o cartao novamente, ele pedira um novo cadastro.", "Confirmar Exclusao", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
+
+    $confirm = [System.Windows.Forms.MessageBox]::Show($form, "Tem certeza que deseja remover o cadastro do cartão '$selectedId'?`n`nAs fotos já salvas não são apagadas. Ao plugar o cartão novamente, ele pedirá um novo cadastro.", "Confirmar exclusão", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
     if ($confirm -eq [System.Windows.Forms.DialogResult]::Yes) {
         Remove-CardRegistration -EventName $script:CurrentEvent -CardIdentifier $selectedId | Out-Null
         $script:CurrentConfig = Get-StationConfig
@@ -1116,9 +1560,10 @@ $btnRemoveCard.Add_Click({
 
 # Acao: Cadastrar Cartao Manualmente
 $btnAddCardManual.Add_Click({
-    $cardIdInput = [Microsoft.VisualBasic.Interaction]::InputBox("Informe o Identificador / Nome do Cartao (Ex: CARD_01 ou EOS_DIGITAL):", "Cadastrar Novo Cartao", "CARTAO_" + (Get-Random -Minimum 100 -Maximum 999))
+    $defaultId = "CARTAO_" + (Get-Random -Minimum 100 -Maximum 999)
+    $cardIdInput = Show-TextPrompt -Title "Cadastrar novo cartão" -Message "Informe um nome ou identificador para o cartão (ex.: CARD_01 ou EOS_DIGITAL):" -DefaultText $defaultId
     if ([string]::IsNullOrWhiteSpace($cardIdInput)) { return }
-    
+
     $res = Show-CardSetupModal -DriveLetter "C:\" -CardIdentifier $cardIdInput.Trim() -EventName $script:CurrentEvent
     if ($null -ne $res) {
         $script:CurrentConfig = Get-StationConfig
@@ -1127,55 +1572,13 @@ $btnAddCardManual.Add_Click({
 })
 
 # -----------------------------------------------------------------------------
-# COLUNA DIREITA: AUDITORIA & HISTORICO DE TRANSFERENCIAS
-# -----------------------------------------------------------------------------
-$pnlRightHist = New-Object System.Windows.Forms.Panel
-$pnlRightHist.Dock = [System.Windows.Forms.DockStyle]::Fill
-$pnlRightHist.BackColor = $colorBg
-$pnlRightHist.Padding = New-Object System.Windows.Forms.Padding(10, 0, 0, 0)
-$mainContainer.Panel2.Controls.Add($pnlRightHist)
-
-$lblHistColTitle = New-Object System.Windows.Forms.Label
-$lblHistColTitle.Text = "AUDITORIA & HISTORICO DE INGESTOES DIT"
-$lblHistColTitle.Font = $fontSubTitle
-$lblHistColTitle.ForeColor = $colorCyan
-$lblHistColTitle.Dock = [System.Windows.Forms.DockStyle]::Top
-$lblHistColTitle.Height = 28
-$pnlRightHist.Controls.Add($lblHistColTitle)
-
-$gridHistory = New-Object System.Windows.Forms.ListView
-$gridHistory.Dock = [System.Windows.Forms.DockStyle]::Fill
-$gridHistory.View = [System.Windows.Forms.View]::Details
-$gridHistory.FullRowSelect = $true
-$gridHistory.GridLines = $false
-$gridHistory.BackColor = $colorElevated
-$gridHistory.ForeColor = $colorText
-$gridHistory.Font = $fontRegular
-$gridHistory.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-[void]$gridHistory.Columns.Add("Hora", 70)
-[void]$gridHistory.Columns.Add("Cartao / Fotografo", 150)
-[void]$gridHistory.Columns.Add("Fotos", 75)
-[void]$gridHistory.Columns.Add("Volume", 75)
-[void]$gridHistory.Columns.Add("Status / Ejecao", 110)
-$pnlRightHist.Controls.Add($gridHistory)
-
-function Adjust-HistoryGridColumns {
-    if ($gridHistory.Columns.Count -ge 5) {
-        $w = $gridHistory.ClientSize.Width
-        $rem = $w - (70 + 150 + 75 + 75) - 4
-        if ($rem -gt 90) {
-            $gridHistory.Columns[4].Width = $rem
-        }
-    }
-}
-$gridHistory.Add_Resize({ Adjust-HistoryGridColumns })
 # FLUXO DE EXECUCAO DE INGESTAO COM INTERRUPCAO SEGURA
 # -----------------------------------------------------------------------------
 $btnCancel.Add_Click({
     if ($script:IsIngesting) {
         $script:CancelRequested = $true
         $btnCancel.Enabled = $false
-        $lblStatusDetail.Text = "Interrupcao solicitada. Finalizando foto atual e limpando arquivos temporarios..."
+        $lblStatusDetail.Text = "Interrupção solicitada. Finalizando a foto atual e limpando arquivos temporários..."
     }
 })
 
@@ -1183,50 +1586,47 @@ function Run-AppIngest {
     param(
         [Parameter(Mandatory=$true)][string]$SourcePath
     )
-    
+
     if ($script:IsIngesting) {
-        [System.Windows.Forms.MessageBox]::Show($form, "Uma ingestao ja esta em andamento. Aguarde a conclusao.", "Aviso", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+        [System.Windows.Forms.MessageBox]::Show($form, "Uma descarga já está em andamento. Aguarde a conclusão.", "Aviso", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
         return
     }
-    
+
     if (!(Test-Path $SourcePath)) {
-        [System.Windows.Forms.MessageBox]::Show($form, "Caminho de origem nao encontrado: $SourcePath", "Erro", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        [System.Windows.Forms.MessageBox]::Show($form, "Caminho de origem não encontrado: $SourcePath", "Erro", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
         return
     }
-    
+
     $cardId = Get-CardIdentifier -DriveLetter $SourcePath
-    
+
     # Checa se o cartao ja foi cadastrado para este evento
     $cardReg = Get-CardRegistration -EventName $script:CurrentEvent -CardIdentifier $cardId
     if ($null -eq $cardReg) {
         # Primeira vez que o cartao e visto neste evento: exibe modal de cadastro obrigatorio
         $cardReg = Show-CardSetupModal -DriveLetter $SourcePath -CardIdentifier $cardId -EventName $script:CurrentEvent
         if ($null -eq $cardReg) {
-            $lblStatusDetail.Text = "Ingestao cancelada. O cartao $cardId precisa ser configurado para o evento $script:CurrentEvent."
+            $lblStatusDetail.Text = "Descarga cancelada. O cartão $cardId precisa ser cadastrado no evento $script:CurrentEvent."
             return
         }
         $script:CurrentConfig = Get-StationConfig
         Refresh-EventCardsGrid
     }
-    
+
     $targetDest = Get-DestinationForCard -CardIdentifier $cardId -SourcePath $SourcePath -Config $script:CurrentConfig -EventName $script:CurrentEvent
-    
+
     $subfToCopy = if ($cardReg.PhotoSubfolder) { $cardReg.PhotoSubfolder } else { "" }
-    
+
     $script:IsIngesting = $true
     $script:CancelRequested = $false
     $btnCancel.Enabled = $true
     $btnIngestNow.Enabled = $false
-    
-    $lblBadge.Text = "INGESTAO EM ANDAMENTO"
-    $lblBadge.ForeColor = $colorAmber
-    $lblBadge.BackColor = [System.Drawing.Color]::FromArgb(40, 245, 158, 11)
-    $lblStatusDetail.Text = "Descarregando: $($cardReg.Photographer) [$cardId] -> $targetDest"
-    $progressBar.Value = 0
+
+    Set-AppStatus 'busy' "DESCARGA EM ANDAMENTO" "$($cardReg.Photographer)  ·  cartão $cardId"
+    Set-Progress 0
     $lblProgressMetrics.Text = "Calculando arquivos..."
     $lblFileDetail.Text = ""
     $form.Update()
-    
+
     try {
         $res = Invoke-CardIngest -SourceDrive $SourcePath `
             -DestinationFolder $targetDest `
@@ -1238,57 +1638,35 @@ function Run-AppIngest {
                 param($prog)
                 if ($prog.TotalFiles -gt 0) {
                     $pct = [math]::Min(100, [int](($prog.ProcessedFiles / $prog.TotalFiles) * 100))
-                    $progressBar.Value = $pct
-                    $lblProgressMetrics.Text = "$($prog.ProcessedFiles) / $($prog.TotalFiles) fotos ($pct%)"
+                    Set-Progress $pct
+                    $lblProgressMetrics.Text = "$($prog.ProcessedFiles) / $($prog.TotalFiles) fotos  ·  $pct%"
                 }
-                $lblFileDetail.Text = "Foto: $($prog.CurrentFile)"
+                $lblFileDetail.Text = "$($prog.CurrentFile)"
                 [System.Windows.Forms.Application]::DoEvents()
             }
-        
-        $item = New-Object System.Windows.Forms.ListViewItem((Get-Date -Format "HH:mm:ss"))
-        [void]$item.SubItems.Add("$($cardReg.Photographer) ($cardId)")
-        [void]$item.SubItems.Add("+$($res.CopiedCount) fotos")
+
         $mb = [math]::Round($res.TotalBytesCopied / 1MB, 1)
-        [void]$item.SubItems.Add("$mb MB")
-        
-        $statusColText = if ($res.Status -eq "ABORTED_BY_USER") {
-            "[INTERROMPIDO]"
-        } elseif ($res.Ejected) {
-            "[OK] Ejetado"
-        } else {
-            "[OK] Salvo"
-        }
-        [void]$item.SubItems.Add($statusColText)
-        $gridHistory.Items.Insert(0, $item)
-        
+        $who = "$($cardReg.Photographer)  ($cardId)"
+
         if ($res.Status -eq "ABORTED_BY_USER") {
-            $lblBadge.Text = "INTERROMPIDO COM SEGURANCA"
-            $lblBadge.ForeColor = $colorAmber
-            $lblBadge.BackColor = [System.Drawing.Color]::FromArgb(40, 245, 158, 11)
-            $lblStatusDetail.Text = "Ingestao interrompida pelo usuario. Nenhum arquivo foi corrompido e o cartao esta intacto."
-            [System.Windows.Forms.MessageBox]::Show($form, "Ingestao interrompida com total seguranca!`n`nNenhum arquivo foi corrompido, os arquivos ja verificados continuam salvos e o cartao esta intacto.", "Interrupcao Segura", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+            Add-HistoryRow -Time (Get-Date -Format "HH:mm:ss") -Who $who -Photos "+$($res.CopiedCount)" -Volume "$mb MB" -StatusText "Interrompido" -StatusColor $colorAmber
+            Set-AppStatus 'warn' "INTERROMPIDO COM SEGURANÇA" "Descarga interrompida por você. Nenhum arquivo foi corrompido e o cartão está intacto."
+            [System.Windows.Forms.MessageBox]::Show($form, "Descarga interrompida com total segurança!`n`nNenhum arquivo foi corrompido, os arquivos já verificados continuam salvos e o cartão está intacto.", "Interrupção segura", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
         }
         elseif ($res.Ejected) {
-            $progressBar.Value = 100
-            $lblBadge.Text = "CONCLUIDO & EJETADO"
-            $lblBadge.ForeColor = $colorGreen
-            $lblBadge.BackColor = [System.Drawing.Color]::FromArgb(40, 16, 185, 129)
-            $lblStatusDetail.Text = "Backup de $($cardReg.Photographer) concluido! Cartao ejetado com seguranca. Pode retirar."
+            Add-HistoryRow -Time (Get-Date -Format "HH:mm:ss") -Who $who -Photos "+$($res.CopiedCount)" -Volume "$mb MB" -StatusText "Salvo e ejetado" -StatusColor $colorGreen
+            Set-Progress 100
+            Set-AppStatus 'ok' "CONCLUÍDO E EJETADO" "Backup de $($cardReg.Photographer) concluído! Cartão ejetado com segurança. Pode retirar."
             $lblFileDetail.Text = ""
         } else {
-            $progressBar.Value = 100
-            $lblBadge.Text = "CONCLUIDO COM SUCESSO"
-            $lblBadge.ForeColor = $colorGreen
-            $lblBadge.BackColor = [System.Drawing.Color]::FromArgb(40, 16, 185, 129)
-            $lblStatusDetail.Text = "Backup de $($cardReg.Photographer) concluido com sucesso."
+            Add-HistoryRow -Time (Get-Date -Format "HH:mm:ss") -Who $who -Photos "+$($res.CopiedCount)" -Volume "$mb MB" -StatusText "Salvo" -StatusColor $colorGreen
+            Set-Progress 100
+            Set-AppStatus 'ok' "CONCLUÍDO COM SUCESSO" "Backup de $($cardReg.Photographer) concluído com sucesso."
         }
     }
     catch {
-        $lblBadge.Text = "ERRO"
-        $lblBadge.ForeColor = $colorRed
-        $lblBadge.BackColor = [System.Drawing.Color]::FromArgb(40, 239, 68, 68)
-        $lblStatusDetail.Text = "Erro: $_"
-        [System.Windows.Forms.MessageBox]::Show($form, "Erro durante a ingestao:`n$_", "Erro Critico", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        Set-AppStatus 'error' "ERRO" "Erro: $_"
+        [System.Windows.Forms.MessageBox]::Show($form, "Erro durante a descarga:`n$_", "Erro crítico", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
     }
     finally {
         $script:IsIngesting = $false
@@ -1302,7 +1680,7 @@ function Run-AppIngest {
 $btnIngestNow.Add_Click({
     $src = $txtSource.Text.Trim()
     if ([string]::IsNullOrWhiteSpace($src)) {
-        [System.Windows.Forms.MessageBox]::Show($form, "Informe a unidade ou pasta do cartao fotografico.", "Aviso", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+        [System.Windows.Forms.MessageBox]::Show($form, "Informe a unidade ou pasta do cartão fotográfico (ou use Procurar).", "Aviso", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
         return
     }
     Run-AppIngest -SourcePath $src
@@ -1311,9 +1689,21 @@ $btnIngestNow.Add_Click({
 $btnSwitchEvent.Add_Click({
     $res = Show-EventSelectionModal -IsInitial $false
     if ($res -eq [System.Windows.Forms.DialogResult]::OK) {
-        $lblActiveEventBadge.Text = "EVENTO: $script:CurrentEvent"
+        Set-ActiveEventBadge
         Update-StorageUI
         Refresh-EventCardsGrid
+        $gridHistory.Items.Clear()
+        $lblHistEmpty.Visible = $true
+        $lblHistEmpty.BringToFront()
+    }
+})
+
+# Impede fechar a janela no meio de uma copia (evita estado inconsistente)
+$form.Add_FormClosing({
+    param($s, $e)
+    if ($script:IsIngesting) {
+        $e.Cancel = $true
+        [System.Windows.Forms.MessageBox]::Show($form, "Há uma descarga em andamento.`n`nUse 'Parar com segurança', aguarde a finalização e então feche a janela.", "Descarga em andamento", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
     }
 })
 
@@ -1331,15 +1721,15 @@ $usbTimer.Interval = 1500
 $usbTimer.Add_Tick({
     if ($script:IsIngesting) { return }
     if (-not $script:MonitoringActive) { return }
-    
+
     try {
         $currentReady = [System.IO.DriveInfo]::GetDrives() | Where-Object { $_.IsReady }
         $currentSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-        
+
         foreach ($d in $currentReady) {
             $driveName = $d.Name
             [void]$currentSet.Add($driveName)
-            
+
             if (-not $knownDrives.Contains($driveName)) {
                 Start-Sleep -Milliseconds 1000
                 $dcim = Join-Path $driveName "DCIM"
@@ -1347,7 +1737,7 @@ $usbTimer.Add_Tick({
                 $photos = Get-ChildItem -Path $driveName -File -ErrorAction SilentlyContinue | Where-Object {
                     $script:SUPPORTED_EXTENSIONS -contains $_.Extension.ToUpper()
                 }
-                
+
                 if ((Test-Path $dcim) -or (Test-Path $fotografoTxt) -or ($photos -and $photos.Count -gt 0)) {
                     $txtSource.Text = $driveName
                     $usbTimer.Stop()
@@ -1357,11 +1747,11 @@ $usbTimer.Add_Tick({
                         $usbTimer.Start()
                     }
                 }
-                
+
                 [void]$knownDrives.Add($driveName)
             }
         }
-        
+
         $removed = [System.Collections.Generic.List[string]]::new()
         foreach ($k in $knownDrives) {
             if (-not $currentSet.Contains($k)) {
@@ -1377,7 +1767,7 @@ $usbTimer.Add_Tick({
 # EXIBE MODAL DE SELECAO DE EVENTO NO INICIO DA EXECUCAO
 $form.Add_Load({
     $resInit = Show-EventSelectionModal -IsInitial $true
-    $lblActiveEventBadge.Text = "EVENTO: $script:CurrentEvent"
+    Set-ActiveEventBadge
     Update-StorageUI
     Update-MonitoringUI
     Refresh-EventCardsGrid
