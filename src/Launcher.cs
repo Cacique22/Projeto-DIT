@@ -13,24 +13,50 @@ namespace AutoIngestStation
             try
             {
                 string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-                string scriptPath = Path.Combine(baseDir, "src", "App-Desktop.ps1");
-                if (!File.Exists(scriptPath))
+                string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+                string[] candidatePaths = new string[]
                 {
-                    scriptPath = Path.Combine(baseDir, "App-Desktop.ps1");
+                    Path.Combine(baseDir, "src", "App-Desktop.ps1"),
+                    Path.Combine(baseDir, "App-Desktop.ps1"),
+                    Path.Combine(baseDir, "..", "src", "App-Desktop.ps1"),
+                    Path.Combine(userProfile, "Documents", "GitHub", "auto-ingest-station", "src", "App-Desktop.ps1"),
+                    Path.Combine(@"C:\auto-ingest-station", "src", "App-Desktop.ps1")
+                };
+
+                string foundScript = null;
+                foreach (string candidate in candidatePaths)
+                {
+                    try
+                    {
+                        string fullPath = Path.GetFullPath(candidate);
+                        if (File.Exists(fullPath))
+                        {
+                            foundScript = fullPath;
+                            break;
+                        }
+                    }
+                    catch { }
                 }
 
-                if (!File.Exists(scriptPath))
+                if (foundScript == null)
                 {
-                    MessageBox.Show("Arquivo de aplicativo não encontrado:\n" + scriptPath, "Erro - Estação DIT", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show(
+                        "Arquivo de aplicativo não encontrado em nenhum dos seguintes locais:\n\n" +
+                        string.Join("\n", candidatePaths),
+                        "Erro - Estação DIT",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error
+                    );
                     return;
                 }
 
                 ProcessStartInfo psi = new ProcessStartInfo();
                 psi.FileName = "powershell.exe";
-                psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"" + scriptPath + "\"";
+                psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"" + foundScript + "\"";
                 psi.UseShellExecute = false;
                 psi.CreateNoWindow = true;
-                psi.WorkingDirectory = Path.GetDirectoryName(scriptPath);
+                psi.WorkingDirectory = Path.GetDirectoryName(foundScript);
 
                 Process proc = Process.Start(psi);
                 proc.WaitForExit();
