@@ -1,17 +1,28 @@
-﻿# App-Desktop.ps1 - Aplicativo Grafico Nativo da Estacao de Ingestao DIT
+# App-Desktop.ps1 - Aplicativo Grafico Nativo da Estacao de Ingestao DIT
 try {
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
 } catch {}
 
-$scriptDir = if (![string]::IsNullOrWhiteSpace($PSScriptRoot)) {
-    $PSScriptRoot
-} elseif ($MyInvocation.MyCommand -and ![string]::IsNullOrWhiteSpace($MyInvocation.MyCommand.Path)) {
-    Split-Path -Parent $MyInvocation.MyCommand.Path
-} elseif (Test-Path "C:\auto-ingest-station\src") {
-    "C:\auto-ingest-station\src"
-} else {
-    (Get-Location).Path
+$candidates = [System.Collections.Generic.List[string]]::new()
+if (![string]::IsNullOrWhiteSpace($PSScriptRoot)) { $candidates.Add($PSScriptRoot) }
+if ($MyInvocation.MyCommand -and ![string]::IsNullOrWhiteSpace($MyInvocation.MyCommand.Path)) {
+    $candidates.Add((Split-Path -Parent $MyInvocation.MyCommand.Path))
+}
+$candidates.Add("C:\Users\Usuario\Documents\GitHub\auto-ingest-station\src")
+$candidates.Add("C:\auto-ingest-station\src")
+$candidates.Add((Join-Path (Get-Location).Path "src"))
+$candidates.Add((Get-Location).Path)
+
+$scriptDir = $null
+foreach ($c in $candidates) {
+    if (![string]::IsNullOrWhiteSpace($c) -and (Test-Path (Join-Path $c "ConfigManager.ps1"))) {
+        $scriptDir = $c
+        break
+    }
+}
+if ([string]::IsNullOrWhiteSpace($scriptDir)) {
+    $scriptDir = (Get-Location).Path
 }
 
 $enginePath = Join-Path $scriptDir "IngestEngine.ps1"
@@ -593,7 +604,11 @@ $mainContainer.SplitterWidth = 8
 $mainContainer.SplitterDistance = 640
 # skipped min
 try { $mainContainer.SplitterDistance = 640 } catch {}
-$form.Add_Resize({ try { if ($form.ClientSize.Width -gt 800) { $mainContainer.SplitterDistance = [math]::Max(450, [int]($form.ClientSize.Width * 0.60)) } } catch {} })
+$form.Add_Resize({
+    try {
+        Adjust-CardsGridColumns
+        Adjust-HistoryGridColumns
+    } catch {} try { if ($form.ClientSize.Width -gt 800) { $mainContainer.SplitterDistance = [math]::Max(450, [int]($form.ClientSize.Width * 0.60)) } } catch {} })
 $form.Controls.Add($mainContainer)
 
 # PAINEL DE STATUS & PROGRESSO DE INGESTAO (DOCK=TOP)
@@ -859,54 +874,117 @@ $btnFixStorage.Add_Click({
 # -----------------------------------------------------------------------------
 # COLUNA ESQUERDA: CARTOES CADASTRADOS & DISPARO MANUAL
 # -----------------------------------------------------------------------------
+# 1. Painel Inferior: Disparo Manual (Dock = Bottom para ficar sempre visivel e proporcional)
+$pnlManual = New-Object System.Windows.Forms.Panel
+$pnlManual.Dock = [System.Windows.Forms.DockStyle]::Bottom
+$pnlManual.Height = 140
+$pnlManual.BackColor = $colorSurface
+$pnlManual.Padding = New-Object System.Windows.Forms.Padding(14, 10, 14, 10)
+$mainContainer.Panel1.Controls.Add($pnlManual)
+
+$lblManualTitle = New-Object System.Windows.Forms.Label
+$lblManualTitle.Text = "DESCARREGAR MANUALMENTE (SE JA CONECTADO)"
+$lblManualTitle.Font = $fontSubTitle
+$lblManualTitle.ForeColor = $colorCyan
+$lblManualTitle.Dock = [System.Windows.Forms.DockStyle]::Top
+$lblManualTitle.Height = 22
+$pnlManual.Controls.Add($lblManualTitle)
+
+$lblManualSub = New-Object System.Windows.Forms.Label
+$lblManualSub.Text = "Informe ou selecione a unidade/pasta do cartao fotografico:"
+$lblManualSub.Font = $fontSmall
+$lblManualSub.ForeColor = $colorMuted
+$lblManualSub.Dock = [System.Windows.Forms.DockStyle]::Top
+$lblManualSub.Height = 18
+$pnlManual.Controls.Add($lblManualSub)
+
+$pnlManualInputRow = New-Object System.Windows.Forms.Panel
+$pnlManualInputRow.Dock = [System.Windows.Forms.DockStyle]::Top
+$pnlManualInputRow.Height = 32
+$pnlManualInputRow.Padding = New-Object System.Windows.Forms.Padding(0, 2, 0, 2)
+$pnlManual.Controls.Add($pnlManualInputRow)
+
+$btnBrowseSource = New-Object System.Windows.Forms.Button
+$btnBrowseSource.Text = "Procurar..."
+$btnBrowseSource.Font = $fontRegular
+$btnBrowseSource.BackColor = $colorElevated
+$btnBrowseSource.ForeColor = $colorText
+$btnBrowseSource.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnBrowseSource.Dock = [System.Windows.Forms.DockStyle]::Right
+$btnBrowseSource.Width = 95
+$pnlManualInputRow.Controls.Add($btnBrowseSource)
+
+$pnlInputSpacer = New-Object System.Windows.Forms.Panel
+$pnlInputSpacer.Dock = [System.Windows.Forms.DockStyle]::Right
+$pnlInputSpacer.Width = 8
+$pnlManualInputRow.Controls.Add($pnlInputSpacer)
+
+$txtSource = New-Object System.Windows.Forms.TextBox
+$txtSource.Dock = [System.Windows.Forms.DockStyle]::Fill
+$txtSource.BackColor = $colorElevated
+$txtSource.ForeColor = $colorText
+$txtSource.Font = $fontMono
+$pnlManualInputRow.Controls.Add($txtSource)
+
+$pnlBtnSpacer = New-Object System.Windows.Forms.Panel
+$pnlBtnSpacer.Dock = [System.Windows.Forms.DockStyle]::Top
+$pnlBtnSpacer.Height = 6
+$pnlManual.Controls.Add($pnlBtnSpacer)
+
+$btnIngestNow = New-Object System.Windows.Forms.Button
+$btnIngestNow.Text = "Iniciar Ingestao Manual Agora"
+$btnIngestNow.Font = $fontBold
+$btnIngestNow.BackColor = $colorCyan
+$btnIngestNow.ForeColor = [System.Drawing.Color]::Black
+$btnIngestNow.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnIngestNow.Dock = [System.Windows.Forms.DockStyle]::Top
+$btnIngestNow.Height = 36
+$pnlManual.Controls.Add($btnIngestNow)
+
+$btnBrowseSource.Add_Click({
+    $fbd = New-Object System.Windows.Forms.FolderBrowserDialog
+    $fbd.Description = "Selecione a Unidade ou Pasta do Cartao Fotografico"
+    if ($fbd.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
+        $txtSource.Text = $fbd.SelectedPath
+    }
+})
+
+# 2. Painel Superior: Cartoes Cadastrados no Evento (Dock = Fill para aproveitar todo espaco)
 $pnlLeftCards = New-Object System.Windows.Forms.Panel
-$pnlLeftCards.Dock = [System.Windows.Forms.DockStyle]::Top
-$pnlLeftCards.Height = 310
+$pnlLeftCards.Dock = [System.Windows.Forms.DockStyle]::Fill
 $pnlLeftCards.BackColor = $colorBg
-$pnlLeftCards.Padding = New-Object System.Windows.Forms.Padding(12, 12, 12, 6)
+$pnlLeftCards.Padding = New-Object System.Windows.Forms.Padding(0, 0, 0, 10)
 $mainContainer.Panel1.Controls.Add($pnlLeftCards)
 
 $lblCardsTitle = New-Object System.Windows.Forms.Label
 $lblCardsTitle.Text = "CARTOES CADASTRADOS NO EVENTO ATUAL"
 $lblCardsTitle.Font = $fontSubTitle
 $lblCardsTitle.ForeColor = $colorCyan
-$lblCardsTitle.Location = New-Object System.Drawing.Point(12, 10)
-$lblCardsTitle.AutoSize = $true
+$lblCardsTitle.Dock = [System.Windows.Forms.DockStyle]::Top
+$lblCardsTitle.Height = 28
 $pnlLeftCards.Controls.Add($lblCardsTitle)
 
-$gridEventCards = New-Object System.Windows.Forms.ListView
-$gridEventCards.Location = New-Object System.Drawing.Point(12, 34)
-$gridEventCards.Size = New-Object System.Drawing.Size(615, 225)
-$gridEventCards.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right -bor [System.Windows.Forms.AnchorStyles]::Bottom
-$gridEventCards.View = [System.Windows.Forms.View]::Details
-$gridEventCards.FullRowSelect = $true
-$gridEventCards.GridLines = $true
-$gridEventCards.MultiSelect = $false
-$gridEventCards.BackColor = $colorElevated
-$gridEventCards.ForeColor = $colorText
-$gridEventCards.Font = $fontRegular
-[void]$gridEventCards.Columns.Add("Cartao / ID", 120)
-[void]$gridEventCards.Columns.Add("Fotografo", 130)
-[void]$gridEventCards.Columns.Add("Subpasta Camera", 120)
-[void]$gridEventCards.Columns.Add("Destino dos Arquivos", 230)
-$pnlLeftCards.Controls.Add($gridEventCards)
-
-# Barra de Botoes de Acao do Cartao
-$pnlCardActions = New-Object System.Windows.Forms.Panel
-$pnlCardActions.Location = New-Object System.Drawing.Point(12, 265)
-$pnlCardActions.Size = New-Object System.Drawing.Size(615, 36)
-$pnlCardActions.Anchor = [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
+# Barra de Botoes de Acao do Cartao (Usando TableLayoutPanel responsivo para NUNCA cortar botoes)
+$pnlCardActions = New-Object System.Windows.Forms.TableLayoutPanel
+$pnlCardActions.Dock = [System.Windows.Forms.DockStyle]::Bottom
+$pnlCardActions.Height = 36
+$pnlCardActions.ColumnCount = 3
+$pnlCardActions.RowCount = 1
+[void]$pnlCardActions.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 35)))
+[void]$pnlCardActions.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 30)))
+[void]$pnlCardActions.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 35)))
+[void]$pnlCardActions.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100)))
 $pnlLeftCards.Controls.Add($pnlCardActions)
 
 $btnEditCard = New-Object System.Windows.Forms.Button
-$btnEditCard.Text = "Editar Cadastro do Cartao"
+$btnEditCard.Text = "Editar Cadastro"
 $btnEditCard.Font = $fontBold
 $btnEditCard.BackColor = $colorCyan
 $btnEditCard.ForeColor = [System.Drawing.Color]::Black
 $btnEditCard.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$btnEditCard.Location = New-Object System.Drawing.Point(0, 0)
-$btnEditCard.Size = New-Object System.Drawing.Size(200, 32)
-$pnlCardActions.Controls.Add($btnEditCard)
+$btnEditCard.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnEditCard.Margin = New-Object System.Windows.Forms.Padding(0, 0, 4, 0)
+$pnlCardActions.Controls.Add($btnEditCard, 0, 0)
 
 $btnRemoveCard = New-Object System.Windows.Forms.Button
 $btnRemoveCard.Text = "Excluir Cadastro"
@@ -914,9 +992,9 @@ $btnRemoveCard.Font = $fontRegular
 $btnRemoveCard.BackColor = $colorElevated
 $btnRemoveCard.ForeColor = $colorRed
 $btnRemoveCard.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$btnRemoveCard.Location = New-Object System.Drawing.Point(210, 0)
-$btnRemoveCard.Size = New-Object System.Drawing.Size(140, 32)
-$pnlCardActions.Controls.Add($btnRemoveCard)
+$btnRemoveCard.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnRemoveCard.Margin = New-Object System.Windows.Forms.Padding(4, 0, 4, 0)
+$pnlCardActions.Controls.Add($btnRemoveCard, 1, 0)
 
 $btnAddCardManual = New-Object System.Windows.Forms.Button
 $btnAddCardManual.Text = "+ Cadastrar Cartao"
@@ -924,9 +1002,42 @@ $btnAddCardManual.Font = $fontRegular
 $btnAddCardManual.BackColor = $colorElevated
 $btnAddCardManual.ForeColor = $colorText
 $btnAddCardManual.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$btnAddCardManual.Location = New-Object System.Drawing.Point(360, 0)
-$btnAddCardManual.Size = New-Object System.Drawing.Size(150, 32)
-$pnlCardActions.Controls.Add($btnAddCardManual)
+$btnAddCardManual.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnAddCardManual.Margin = New-Object System.Windows.Forms.Padding(4, 0, 0, 0)
+$pnlCardActions.Controls.Add($btnAddCardManual, 2, 0)
+
+$pnlCardGridSpacer = New-Object System.Windows.Forms.Panel
+$pnlCardGridSpacer.Dock = [System.Windows.Forms.DockStyle]::Bottom
+$pnlCardGridSpacer.Height = 8
+$pnlLeftCards.Controls.Add($pnlCardGridSpacer)
+
+# Grid de Cartoes (GridLines = $false para eliminar linhas fantasmas brancas no fundo escuro!)
+$gridEventCards = New-Object System.Windows.Forms.ListView
+$gridEventCards.Dock = [System.Windows.Forms.DockStyle]::Fill
+$gridEventCards.View = [System.Windows.Forms.View]::Details
+$gridEventCards.FullRowSelect = $true
+$gridEventCards.GridLines = $false
+$gridEventCards.MultiSelect = $false
+$gridEventCards.BackColor = $colorElevated
+$gridEventCards.ForeColor = $colorText
+$gridEventCards.Font = $fontRegular
+$gridEventCards.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+[void]$gridEventCards.Columns.Add("Cartao / ID", 110)
+[void]$gridEventCards.Columns.Add("Fotografo", 120)
+[void]$gridEventCards.Columns.Add("Subpasta Camera", 110)
+[void]$gridEventCards.Columns.Add("Destino dos Arquivos", 220)
+$pnlLeftCards.Controls.Add($gridEventCards)
+
+function Adjust-CardsGridColumns {
+    if ($gridEventCards.Columns.Count -ge 4) {
+        $w = $gridEventCards.ClientSize.Width
+        $rem = $w - (110 + 120 + 110) - 4
+        if ($rem -gt 100) {
+            $gridEventCards.Columns[3].Width = $rem
+        }
+    }
+}
+$gridEventCards.Add_Resize({ Adjust-CardsGridColumns })
 
 function Refresh-EventCardsGrid {
     $gridEventCards.Items.Clear()
@@ -948,6 +1059,7 @@ function Refresh-EventCardsGrid {
             $gridEventCards.Items.Add($item)
         }
     }
+    Adjust-CardsGridColumns
 }
 
 # Acao: Editar Cartao Selecionado
@@ -1014,103 +1126,49 @@ $btnAddCardManual.Add_Click({
     }
 })
 
-# SEGUNDA PARTE DA COLUNA ESQUERDA: DISPARO MANUAL
-$pnlManual = New-Object System.Windows.Forms.Panel
-$pnlManual.Dock = [System.Windows.Forms.DockStyle]::Fill
-$pnlManual.BackColor = $colorBg
-$pnlManual.Padding = New-Object System.Windows.Forms.Padding(12, 6, 12, 12)
-$mainContainer.Panel1.Controls.Add($pnlManual)
-
-$lblManualTitle = New-Object System.Windows.Forms.Label
-$lblManualTitle.Text = "DESCARREGAR MANUALMENTE (SE JA CONECTADO)"
-$lblManualTitle.Font = $fontSubTitle
-$lblManualTitle.ForeColor = $colorText
-$lblManualTitle.Location = New-Object System.Drawing.Point(12, 10)
-$lblManualTitle.AutoSize = $true
-$pnlManual.Controls.Add($lblManualTitle)
-
-$lblManualSub = New-Object System.Windows.Forms.Label
-$lblManualSub.Text = "Informe a unidade ou subpasta do cartao fotografico:"
-$lblManualSub.Font = $fontRegular
-$lblManualSub.ForeColor = $colorMuted
-$lblManualSub.Location = New-Object System.Drawing.Point(12, 34)
-$lblManualSub.AutoSize = $true
-$pnlManual.Controls.Add($lblManualSub)
-
-$txtSource = New-Object System.Windows.Forms.TextBox
-$txtSource.Location = New-Object System.Drawing.Point(12, 58)
-$txtSource.Size = New-Object System.Drawing.Size(480, 25)
-$txtSource.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
-$txtSource.BackColor = $colorElevated
-$txtSource.ForeColor = $colorText
-$txtSource.Font = $fontMono
-$pnlManual.Controls.Add($txtSource)
-
-$btnBrowseSource = New-Object System.Windows.Forms.Button
-$btnBrowseSource.Text = "Procurar..."
-$btnBrowseSource.Font = $fontRegular
-$btnBrowseSource.BackColor = $colorElevated
-$btnBrowseSource.ForeColor = $colorText
-$btnBrowseSource.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$btnBrowseSource.Location = New-Object System.Drawing.Point(505, 56)
-$btnBrowseSource.Size = New-Object System.Drawing.Size(120, 28)
-$btnBrowseSource.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Right
-$pnlManual.Controls.Add($btnBrowseSource)
-
-$btnBrowseSource.Add_Click({
-    $fbd = New-Object System.Windows.Forms.FolderBrowserDialog
-    $fbd.Description = "Selecione a Unidade ou Pasta do Cartao Fotografico"
-    if ($fbd.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
-        $txtSource.Text = $fbd.SelectedPath
-    }
-})
-
-$btnIngestNow = New-Object System.Windows.Forms.Button
-$btnIngestNow.Text = "Iniciar Ingestao Manual Agora"
-$btnIngestNow.Font = $fontBold
-$btnIngestNow.BackColor = $colorCyan
-$btnIngestNow.ForeColor = [System.Drawing.Color]::Black
-$btnIngestNow.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-$btnIngestNow.Location = New-Object System.Drawing.Point(12, 98)
-$btnIngestNow.Size = New-Object System.Drawing.Size(615, 38)
-$btnIngestNow.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
-$pnlManual.Controls.Add($btnIngestNow)
-
 # -----------------------------------------------------------------------------
 # COLUNA DIREITA: AUDITORIA & HISTORICO DE TRANSFERENCIAS
 # -----------------------------------------------------------------------------
 $pnlRightHist = New-Object System.Windows.Forms.Panel
 $pnlRightHist.Dock = [System.Windows.Forms.DockStyle]::Fill
 $pnlRightHist.BackColor = $colorBg
-$pnlRightHist.Padding = New-Object System.Windows.Forms.Padding(6, 12, 12, 12)
+$pnlRightHist.Padding = New-Object System.Windows.Forms.Padding(10, 0, 0, 0)
 $mainContainer.Panel2.Controls.Add($pnlRightHist)
 
 $lblHistColTitle = New-Object System.Windows.Forms.Label
 $lblHistColTitle.Text = "AUDITORIA & HISTORICO DE INGESTOES DIT"
 $lblHistColTitle.Font = $fontSubTitle
 $lblHistColTitle.ForeColor = $colorCyan
-$lblHistColTitle.Location = New-Object System.Drawing.Point(6, 10)
-$lblHistColTitle.AutoSize = $true
+$lblHistColTitle.Dock = [System.Windows.Forms.DockStyle]::Top
+$lblHistColTitle.Height = 28
 $pnlRightHist.Controls.Add($lblHistColTitle)
 
 $gridHistory = New-Object System.Windows.Forms.ListView
-$gridHistory.Location = New-Object System.Drawing.Point(6, 34)
-$gridHistory.Size = New-Object System.Drawing.Size(430, 410)
 $gridHistory.Dock = [System.Windows.Forms.DockStyle]::Fill
 $gridHistory.View = [System.Windows.Forms.View]::Details
 $gridHistory.FullRowSelect = $true
-$gridHistory.GridLines = $true
+$gridHistory.GridLines = $false
 $gridHistory.BackColor = $colorElevated
 $gridHistory.ForeColor = $colorText
 $gridHistory.Font = $fontRegular
-[void]$gridHistory.Columns.Add("Hora", 65)
-[void]$gridHistory.Columns.Add("Fotografo / Cartao", 130)
-[void]$gridHistory.Columns.Add("Novas", 65)
-[void]$gridHistory.Columns.Add("Volume", 65)
-[void]$gridHistory.Columns.Add("Status", 100)
+$gridHistory.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+[void]$gridHistory.Columns.Add("Hora", 70)
+[void]$gridHistory.Columns.Add("Cartao / Fotografo", 150)
+[void]$gridHistory.Columns.Add("Fotos", 75)
+[void]$gridHistory.Columns.Add("Volume", 75)
+[void]$gridHistory.Columns.Add("Status / Ejecao", 110)
 $pnlRightHist.Controls.Add($gridHistory)
 
-# -----------------------------------------------------------------------------
+function Adjust-HistoryGridColumns {
+    if ($gridHistory.Columns.Count -ge 5) {
+        $w = $gridHistory.ClientSize.Width
+        $rem = $w - (70 + 150 + 75 + 75) - 4
+        if ($rem -gt 90) {
+            $gridHistory.Columns[4].Width = $rem
+        }
+    }
+}
+$gridHistory.Add_Resize({ Adjust-HistoryGridColumns })
 # FLUXO DE EXECUCAO DE INGESTAO COM INTERRUPCAO SEGURA
 # -----------------------------------------------------------------------------
 $btnCancel.Add_Click({
@@ -1176,7 +1234,7 @@ function Run-AppIngest {
             -AutoEject $script:CurrentConfig.AutoEject `
             -CardPhotoSubfolder $subfToCopy `
             -CancelCheck { return $script:CancelRequested } `
-            -OnProgress {
+            -ProgressCallback {
                 param($prog)
                 if ($prog.TotalFiles -gt 0) {
                     $pct = [math]::Min(100, [int](($prog.ProcessedFiles / $prog.TotalFiles) * 100))

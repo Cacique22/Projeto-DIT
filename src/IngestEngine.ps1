@@ -1,4 +1,4 @@
-# IngestEngine.ps1 - Motor de Ingestão de Alta Confiabilidade DIT
+﻿# IngestEngine.ps1 - Motor de Ingestão de Alta Confiabilidade DIT
 
 $script:SUPPORTED_EXTENSIONS = @(
     ".CR2", ".CR3",        # Canon RAW
@@ -206,7 +206,7 @@ function Invoke-CardIngest {
         [Parameter(Mandatory=$false)][string]$EventName = "Evento_Geral",
         [Parameter(Mandatory=$false)][bool]$AutoEject = $false,
         [Parameter(Mandatory=$false)][scriptblock]$CancelCheck = $null,
-        [Parameter(Mandatory=$false)][scriptblock]$ProgressCallback = $null,
+        [Alias('OnProgress')][Parameter(Mandatory=$false)][scriptblock]$ProgressCallback = $null,
         [Parameter(Mandatory=$false)][string]$CardPhotoSubfolder = ""
     )
     

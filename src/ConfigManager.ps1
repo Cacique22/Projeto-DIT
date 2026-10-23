@@ -261,6 +261,12 @@ function New-StationEvent {
     $ht.Events[$cleanName] = $evObj
     $ht["CurrentEvent"] = $cleanName
     $ht["EventName"] = $cleanName
+    $parent = Split-Path -Parent $dest
+    if ($parent -and (Test-Path $parent)) {
+        $ht["TargetRootPath"] = $parent
+    } else {
+        $ht["TargetRootPath"] = $dest
+    }
     
     Set-StationConfig -Config $ht -ConfigPath $ConfigPath | Out-Null
     
