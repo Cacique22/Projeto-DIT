@@ -26,6 +26,7 @@ function Get-StationConfig {
         BuzzerEnabled      = $true
         AutoEject          = $true
         Port               = 8080
+        CardMappings       = @()
         LastUpdated        = (Get-Date -Format "o")
     }
     
@@ -40,6 +41,7 @@ function Get-StationConfig {
             if ($null -ne $loaded.BuzzerEnabled) { $defaultConfig.BuzzerEnabled = [bool]$loaded.BuzzerEnabled }
             if ($null -ne $loaded.AutoEject) { $defaultConfig.AutoEject = [bool]$loaded.AutoEject }
             if ($loaded.Port) { $defaultConfig.Port = [int]$loaded.Port }
+            if ($loaded.CardMappings) { $defaultConfig.CardMappings = @($loaded.CardMappings) }
             if ($loaded.LastUpdated) { $defaultConfig.LastUpdated = $loaded.LastUpdated }
             
             return $defaultConfig
@@ -77,6 +79,10 @@ function Set-StationConfig {
         }
     }
     
+    if ($Config.ContainsKey("CardMappings")) {
+        $Config["CardMappings"] = @($Config["CardMappings"])
+    }
+    
     $Config["LastUpdated"] = (Get-Date -Format "o")
     
     $dir = Split-Path -Parent $ConfigPath
@@ -88,6 +94,95 @@ function Set-StationConfig {
     [System.IO.File]::WriteAllText($ConfigPath, $jsonContent, [System.Text.Encoding]::UTF8)
     
     return $Config
+}
+
+function Get-DestinationForCard {
+    param(
+        [Parameter(Mandatory=$true)][string]$CardIdentifier,
+        [Parameter(Mandatory=$true)][string]$SourcePath,
+        [Parameter(Mandatory=$true)]$Config
+    )
+    
+    $driveRoot = [System.IO.Path]::GetPathRoot($SourcePath).TrimEnd('\')
+    
+    # 1. Checa se existe mapeamento customizado habilitado para este cartão ou letra de drive
+    if ($Config.CardMappings) {
+        foreach ($map in $Config.CardMappings) {
+            $isEnabled = if ($null -ne $map.Enabled) { [bool]$map.Enabled } else { $true }
+            if ($isEnabled -and !([string]::IsNullOrWhiteSpace($map.Identifier))) {
+                if ($map.Identifier.Equals($CardIdentifier, [System.StringComparison]::OrdinalIgnoreCase) -or
+                    $map.Identifier.Equals($driveRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    
+                    if (![string]::IsNullOrWhiteSpace($map.Destination)) {
+                        return [System.IO.Path]::Combine($map.Destination, $Config.EventName, $CardIdentifier)
+                    }
+                }
+            }
+        }
+    }
+    
+    # 2. Destino padrão da estação
+    return [System.IO.Path]::Combine($Config.TargetRootPath, $Config.EventName, $CardIdentifier)
+}
+
+function Add-CardMappingRule {
+    param(
+        [Parameter(Mandatory=$true)][string]$Identifier,
+        [Parameter(Mandatory=$true)][string]$Destination,
+        [string]$Description = "",
+        [string]$ConfigPath = $script:DefaultConfigFile
+    )
+    
+    $cfg = Get-StationConfig -ConfigPath $ConfigPath
+    $list = [System.Collections.Generic.List[PSObject]]::new()
+    
+    if ($cfg.CardMappings) {
+        foreach ($m in $cfg.CardMappings) {
+            if (-not $m.Identifier.Equals($Identifier, [System.StringComparison]::OrdinalIgnoreCase)) {
+                $list.Add($m)
+            }
+        }
+    }
+    
+    $newRule = [PSCustomObject]@{
+        Identifier  = $Identifier.Trim()
+        Destination = $Destination.Trim()
+        Description = $Description.Trim()
+        Enabled     = $true
+    }
+    $list.Add($newRule)
+    
+    $ht = @{}
+    foreach ($k in $cfg.Keys) { $ht[$k] = $cfg[$k] }
+    $ht["CardMappings"] = $list.ToArray()
+    
+    Set-StationConfig -Config $ht -ConfigPath $ConfigPath | Out-Null
+    return $newRule
+}
+
+function Remove-CardMappingRule {
+    param(
+        [Parameter(Mandatory=$true)][string]$Identifier,
+        [string]$ConfigPath = $script:DefaultConfigFile
+    )
+    
+    $cfg = Get-StationConfig -ConfigPath $ConfigPath
+    $list = [System.Collections.Generic.List[PSObject]]::new()
+    
+    if ($cfg.CardMappings) {
+        foreach ($m in $cfg.CardMappings) {
+            if (-not $m.Identifier.Equals($Identifier, [System.StringComparison]::OrdinalIgnoreCase)) {
+                $list.Add($m)
+            }
+        }
+    }
+    
+    $ht = @{}
+    foreach ($k in $cfg.Keys) { $ht[$k] = $cfg[$k] }
+    $ht["CardMappings"] = $list.ToArray()
+    
+    Set-StationConfig -Config $ht -ConfigPath $ConfigPath | Out-Null
+    return $true
 }
 
 function Get-AvailableDrivesInfo {

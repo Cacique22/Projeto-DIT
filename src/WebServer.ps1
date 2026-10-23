@@ -11,7 +11,7 @@ if (Test-Path $enginePath) { . $enginePath }
 if (Test-Path $configPath) { . $configPath }
 
 # Estado Global da Estação
-$script:StationState = "IDLE" # "IDLE" | "INGESTING" | "COMPLETED_EJECTED" | "ERROR"
+$script:StationState = "IDLE" # "IDLE" | "INGESTING" | "COMPLETED_EJECTED" | "ABORTED" | "ERROR"
 $script:ActiveCard = ""
 $script:FilesDone = 0
 $script:TotalFiles = 0
@@ -22,6 +22,17 @@ $script:StatusMessage = "Sistema Armado e Pronto"
 $script:IngestHistory = [System.Collections.Generic.List[PSObject]]::new()
 $script:IsProcessingIngest = $false
 $script:PendingIngestQueue = [System.Collections.Concurrent.ConcurrentQueue[string]]::new()
+$script:CancelRequested = $false
+
+function Request-IngestCancellation {
+    if ($script:IsProcessingIngest) {
+        $script:CancelRequested = $true
+        $script:StatusMessage = "Cancelamento solicitado. Finalizando com segurança..."
+        Write-Host "[!] Solicitado cancelamento seguro da ingestão..." -ForegroundColor Yellow
+        return $true
+    }
+    return $false
+}
 
 function Start-StationIngestProcess {
     param(
@@ -30,28 +41,33 @@ function Start-StationIngestProcess {
     )
     
     if ($script:IsProcessingIngest) {
-        Write-Warning "Ingestao ja em andamento. Ignorando solicitacao para $SourceDrive"
-        return @{ Error = "Ingestao ja em andamento" }
+        Write-Warning "Ingestão já em andamento. Ignorando solicitação para $SourceDrive"
+        return @{ Error = "Ingestão já em andamento" }
     }
     
     $script:IsProcessingIngest = $true
+    $script:CancelRequested = $false
     $script:StationState = "INGESTING"
     $script:ActiveCard = Get-CardIdentifier -DriveLetter $SourceDrive
     $script:FilesDone = 0
     $script:TotalFiles = 0
     $script:BytesDone = [int64]0
     $script:TotalBytes = [int64]0
-    $script:CurrentFile = "Analisando cartao..."
+    $script:CurrentFile = "Analisando cartão..."
     $script:StatusMessage = "Processando $SourceDrive..."
     
     $cfg = Get-StationConfig
     $shouldEject = if ($null -ne $cfg.AutoEject) { [bool]$cfg.AutoEject } else { $true }
     
+    # Resolve destino (customizado por cartão ou padrão da estação)
+    $resolvedDest = Get-DestinationForCard -CardIdentifier $script:ActiveCard -SourcePath $SourceDrive -Config $cfg
+    
     try {
         $result = Invoke-CardIngest -SourceDrive $SourceDrive `
-            -DestinationFolder $cfg.TargetRootPath `
+            -DestinationFolder $resolvedDest `
             -EventName $cfg.EventName `
             -AutoEject $shouldEject `
+            -CancelCheck { $script:CancelRequested } `
             -ProgressCallback {
                 param($p)
                 $script:FilesDone = $p.CurrentIndex
@@ -72,24 +88,29 @@ function Start-StationIngestProcess {
         }
         $script:IngestHistory.Insert(0, $historyItem)
         
-        if ($result.Ejected) {
+        if ($result.Status -eq "ABORTED_BY_USER") {
+            $script:StationState = "ABORTED"
+            $script:StatusMessage = "Ingestão cancelada com segurança. Nenhum arquivo corrompido."
+        }
+        elseif ($result.Ejected) {
             $script:StationState = "COMPLETED_EJECTED"
-            $script:StatusMessage = "Backup concluido! Cartao ejetado com seguranca. Pode retirar."
+            $script:StatusMessage = "Backup concluído! Cartão ejetado com segurança. Pode retirar."
         } else {
             $script:StationState = "IDLE"
-            $script:StatusMessage = "Ingestao concluida com sucesso."
+            $script:StatusMessage = "Ingestão concluída com sucesso."
         }
         
         return $result
     }
     catch {
         $script:StationState = "ERROR"
-        $script:StatusMessage = "Erro durante a ingestao: $_"
+        $script:StatusMessage = "Erro durante a ingestão: $_"
         Write-Host "Erro em Start-StationIngestProcess: $_" -ForegroundColor Red
         return @{ Error = $_.ToString() }
     }
     finally {
         $script:IsProcessingIngest = $false
+        $script:CancelRequested = $false
         $script:CurrentFile = ""
     }
 }
@@ -155,7 +176,7 @@ function Handle-HttpRequest {
     $response = $Context.Response
     
     $response.AddHeader("Access-Control-Allow-Origin", "*")
-    $response.AddHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    $response.AddHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
     $response.AddHeader("Access-Control-Allow-Headers", "Content-Type")
     
     if ($request.HttpMethod -eq "OPTIONS") {
@@ -180,6 +201,7 @@ function Handle-HttpRequest {
                 TotalBytes    = $script:TotalBytes
                 CurrentFile   = $script:CurrentFile
                 StatusMessage = $script:StatusMessage
+                IsIngesting   = $script:IsProcessingIngest
                 Config        = $cfg
                 Drives        = @($drives)
             }
@@ -189,6 +211,58 @@ function Handle-HttpRequest {
             $response.ContentType = "application/json; charset=utf-8"
             $response.ContentLength64 = $buffer.Length
             $response.OutputStream.Write($buffer, 0, $buffer.Length)
+        }
+        elseif ($path -eq "/api/cancel" -and $request.HttpMethod -eq "POST") {
+            $ok = Request-IngestCancellation
+            $resObj = @{ Cancelled = $ok; Message = if ($ok) { "Cancelamento solicitado com sucesso" } else { "Nenhuma ingestão em andamento" } }
+            $json = $resObj | ConvertTo-Json
+            $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
+            $response.ContentType = "application/json; charset=utf-8"
+            $response.ContentLength64 = $buffer.Length
+            $response.OutputStream.Write($buffer, 0, $buffer.Length)
+        }
+        elseif ($path -eq "/api/mappings" -and $request.HttpMethod -eq "GET") {
+            $cfg = Get-StationConfig
+            $mappings = if ($cfg.CardMappings) { @($cfg.CardMappings) } else { @() }
+            $json = $mappings | ConvertTo-Json -Depth 3
+            if ([string]::IsNullOrWhiteSpace($json)) { $json = "[]" }
+            elseif (-not $json.Trim().StartsWith("[")) { $json = "[$json]" }
+            $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
+            $response.ContentType = "application/json; charset=utf-8"
+            $response.ContentLength64 = $buffer.Length
+            $response.OutputStream.Write($buffer, 0, $buffer.Length)
+        }
+        elseif ($path -eq "/api/mappings" -and $request.HttpMethod -eq "POST") {
+            $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+            $body = $reader.ReadToEnd()
+            $payload = $body | ConvertFrom-Json
+            
+            if ($payload.Identifier -and $payload.Destination) {
+                $savedRule = Add-CardMappingRule -Identifier $payload.Identifier -Destination $payload.Destination -Description ($payload.Description)
+                $json = $savedRule | ConvertTo-Json
+                $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
+                $response.ContentType = "application/json; charset=utf-8"
+                $response.ContentLength64 = $buffer.Length
+                $response.OutputStream.Write($buffer, 0, $buffer.Length)
+            } else {
+                $response.StatusCode = 400
+                $errBytes = [System.Text.Encoding]::UTF8.GetBytes('{"Error":"Identifier e Destination sao obrigatorios"}')
+                $response.OutputStream.Write($errBytes, 0, $errBytes.Length)
+            }
+        }
+        elseif ($path -eq "/api/mappings" -and $request.HttpMethod -eq "DELETE") {
+            $ident = $request.QueryString["identifier"]
+            if ($ident) {
+                Remove-CardMappingRule -Identifier $ident | Out-Null
+                $buffer = [System.Text.Encoding]::UTF8.GetBytes('{"Status":"DELETED"}')
+                $response.ContentType = "application/json; charset=utf-8"
+                $response.ContentLength64 = $buffer.Length
+                $response.OutputStream.Write($buffer, 0, $buffer.Length)
+            } else {
+                $response.StatusCode = 400
+                $errBytes = [System.Text.Encoding]::UTF8.GetBytes('{"Error":"Parâmetro identifier ausente"}')
+                $response.OutputStream.Write($errBytes, 0, $errBytes.Length)
+            }
         }
         elseif ($path -eq "/api/drives") {
             $drives = @(Get-AvailableDrivesInfo)
@@ -228,6 +302,7 @@ function Handle-HttpRequest {
             if ($null -ne $updates.SafeSpaceBufferGB) { $ht["SafeSpaceBufferGB"] = [int]$updates.SafeSpaceBufferGB }
             if ($null -ne $updates.BuzzerEnabled) { $ht["BuzzerEnabled"] = [bool]$updates.BuzzerEnabled }
             if ($null -ne $updates.AutoEject) { $ht["AutoEject"] = [bool]$updates.AutoEject }
+            if ($null -ne $updates.CardMappings) { $ht["CardMappings"] = @($updates.CardMappings) }
             
             $saved = Set-StationConfig -Config $ht
             $json = $saved | ConvertTo-Json -Depth 4
@@ -239,6 +314,7 @@ function Handle-HttpRequest {
         elseif ($path -eq "/api/history") {
             $json = $script:IngestHistory | ConvertTo-Json -Depth 3
             if ([string]::IsNullOrWhiteSpace($json)) { $json = "[]" }
+            elseif (-not $json.Trim().StartsWith("[")) { $json = "[$json]" }
             $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
             $response.ContentType = "application/json; charset=utf-8"
             $response.ContentLength64 = $buffer.Length

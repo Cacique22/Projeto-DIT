@@ -8,6 +8,7 @@ $script:SUPPORTED_EXTENSIONS = @(
     ".RAF",                # Fujifilm RAW
     ".RW2",                # Panasonic RAW
     ".ORF",                # Olympus RAW
+    ".RAW",                # Generic RAW / Leica / Panasonic
     ".JPG", ".JPEG",       # JPEGs de alta resolução
     ".HEIC", ".HIF",       # High Efficiency Images
     ".MP4", ".MOV"         # Vídeos do evento
@@ -173,7 +174,7 @@ function Invoke-SafeCardEject {
 }
 
 function Emit-IngestSound {
-    param([ValidateSet("Start", "Success", "Error")][string]$Type)
+    param([ValidateSet("Start", "Success", "Error", "Cancel")][string]$Type)
     
     try {
         switch ($Type) {
@@ -184,6 +185,10 @@ function Emit-IngestSound {
                 [Console]::Beep(523, 120)
                 [Console]::Beep(659, 120)
                 [Console]::Beep(784, 300)
+            }
+            "Cancel" {
+                [Console]::Beep(440, 150)
+                [Console]::Beep(330, 250)
             }
             "Error" {
                 [Console]::Beep(220, 400)
@@ -200,6 +205,7 @@ function Invoke-CardIngest {
         [Parameter(Mandatory=$true)][string]$DestinationFolder,
         [Parameter(Mandatory=$false)][string]$EventName = "Evento_Geral",
         [Parameter(Mandatory=$false)][bool]$AutoEject = $false,
+        [Parameter(Mandatory=$false)][scriptblock]$CancelCheck = $null,
         [Parameter(Mandatory=$false)][scriptblock]$ProgressCallback = $null
     )
     
@@ -211,7 +217,14 @@ function Invoke-CardIngest {
     }
     
     $cardId = Get-CardIdentifier -DriveLetter $cleanSource
-    $finalDestination = [System.IO.Path]::Combine($DestinationFolder, $EventName, $cardId)
+    
+    # Se DestinationFolder já terminar com o cardId, usa diretamente; caso contrário compõe [Destino]\[Evento]\[CardId]
+    $finalDestination = if ($DestinationFolder.EndsWith($cardId, [System.StringComparison]::OrdinalIgnoreCase)) {
+        $DestinationFolder
+    } else {
+        [System.IO.Path]::Combine($DestinationFolder, $EventName, $cardId)
+    }
+    
     $manifestPath = [System.IO.Path]::Combine($finalDestination, "manifest.jsonl")
     
     if (!(Test-Path $finalDestination)) {
@@ -290,8 +303,29 @@ function Invoke-CardIngest {
     $copiedCount = 0
     $bytesTransferred = [int64]0
     $errors = [System.Collections.Generic.List[string]]::new()
+    $wasAborted = $false
     
     for ($i = 0; $i -lt $filesToCopy.Count; $i++) {
+        
+        # Invariante de Interrupção Segura: Checa se o usuário solicitou cancelamento antes de cada foto
+        if ($CancelCheck -and (& $CancelCheck)) {
+            $wasAborted = $true
+            Write-Warning "Cancelamento solicitado pelo usuário. Interrompendo com segurança e sem corrupção..."
+            Emit-IngestSound -Type "Cancel"
+            
+            $abortEntry = [ordered]@{
+                timestamp_utc   = [System.DateTime]::UtcNow.ToString("o")
+                card_identifier = $cardId
+                relative_path   = ""
+                bytes           = 0
+                sha256          = ""
+                status          = "ABORTED_BY_USER"
+            }
+            $jsonLine = $abortEntry | ConvertTo-Json -Compress
+            [System.IO.File]::AppendAllLines($manifestPath, [string[]]@($jsonLine), [System.Text.Encoding]::UTF8)
+            break
+        }
+        
         $srcFile = $filesToCopy[$i]
         $relPath = $srcFile.FullName.Substring($cleanSource.Length)
         $targetFile = [System.IO.Path]::Combine($finalDestination, $relPath)
@@ -308,6 +342,16 @@ function Invoke-CardIngest {
         
         try {
             [System.IO.File]::Copy($srcFile.FullName, $stagingFile, $true)
+            
+            # Se cancelou durante a cópia da foto atual, purga o staging imediatamente
+            if ($CancelCheck -and (& $CancelCheck)) {
+                $wasAborted = $true
+                if (Test-Path $stagingFile) {
+                    Remove-Item -Path $stagingFile -Force -ErrorAction SilentlyContinue
+                }
+                Emit-IngestSound -Type "Cancel"
+                break
+            }
             
             $stagingItem = Get-Item $stagingFile
             if ($stagingItem.Length -ne $srcFile.Length) {
@@ -374,6 +418,22 @@ function Invoke-CardIngest {
     
     $endTime = [System.DateTime]::UtcNow
     $duration = [math]::Round(($endTime - $startTime).TotalSeconds, 2)
+    
+    if ($wasAborted) {
+        return @{
+            Status           = "ABORTED_BY_USER"
+            TotalFound       = $allFiles.Count
+            CopiedCount      = $copiedCount
+            SkippedCount     = $skippedCount
+            TotalBytesCopied = $bytesTransferred
+            CardIdentifier   = $cardId
+            Destination      = $finalDestination
+            DurationSeconds  = $duration
+            Errors           = $errors.ToArray()
+            Ejected          = $false
+            EjectMessage     = "Ingestão interrompida com segurança pelo usuário. Cartão mantido inserido."
+        }
+    }
     
     if ($errors.Count -eq 0) {
         Emit-IngestSound -Type "Success"
