@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Script principal de inicialização da Estação de Ingestão DIT.
-    Inicia o Servidor Web e o Daemon de Detecção Automática de Cartões USB.
+    Inicia o Servidor Web, o Daemon de Detecção e Ejeção Automática de Cartões.
 #>
 
 $ErrorActionPreference = "Continue"
@@ -22,33 +22,48 @@ $cfg = Get-StationConfig
 Write-Host "Destino Atual  : $($cfg.TargetRootPath)" -ForegroundColor White
 Write-Host "Evento Atual   : $($cfg.EventName)" -ForegroundColor White
 Write-Host "Porta Web      : $($cfg.Port)" -ForegroundColor White
+Write-Host "Auto-Ejeção    : $(if ($cfg.AutoEject) { 'ATIVADA (Ejeta ao concluir)' } else { 'DESATIVADA' })" -ForegroundColor Green
 
 # Inicia Servidor Web
 $listener = Start-IngestHttpServer -ListenPort $cfg.Port
 
-# Abre a interface no navegador padrão
 $url = "http://localhost:$($cfg.Port)/"
 Start-Process $url
 
-Write-Host "`nPainel de controle aberto no navegador: $url" -ForegroundColor Green
-Write-Host "Também acessível na rede local pelo IP desta máquina (Porta $($cfg.Port))." -ForegroundColor Gray
-Write-Host "Pressione Ctrl+C para encerrar a estação.`n" -ForegroundColor DarkGray
+Write-Host "`n[✓] Painel de controle aberto no navegador: $url" -ForegroundColor Green
+Write-Host "[✓] Também acessível por celulares na rede local: http://[IP-DESTA-MAQUINA]:$($cfg.Port)/" -ForegroundColor Gray
+Write-Host "[✓] Monitorando inserção de cartões SD / Leitores USB..." -ForegroundColor Cyan
+Write-Host "Pressione Ctrl+C para encerrar.`n" -ForegroundColor DarkGray
 
-# Inicia thread/loop de atendimento HTTP e monitoramento de cartões
 $publicFolder = Join-Path $PSScriptRoot "public"
 
-# Monitor de USB em background ou loop cooperativo
+# Monitor de USB
 $knownDrives = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 $drives = [System.IO.DriveInfo]::GetDrives() | Where-Object { $_.IsReady }
 foreach ($d in $drives) { [void]$knownDrives.Add($d.Name) }
 
 try {
     while ($listener.IsListening) {
-        # Atendimento de requisições HTTP assíncronas / não bloqueantes
         $contextTask = $listener.GetContextAsync()
         
         while (-not $contextTask.IsCompleted) {
-            # Durante a espera de requisições HTTP, verifica se novos discos foram plugados
+            
+            # 1. Processa fila de ingestão pendente (disparada via Web ou App)
+            $pendingDrive = $null
+            if ($script:PendingIngestQueue.TryDequeue([ref]$pendingDrive)) {
+                Write-Host "`n[!] Ingestão manual recebida para: $pendingDrive" -ForegroundColor Cyan
+                try {
+                    $result = Start-StationIngestProcess -SourceDrive $pendingDrive -AutoEject $cfg.AutoEject
+                    Write-Host "[✓] Ingestão concluída com status: $($result.Status)" -ForegroundColor Green
+                    if ($result.Ejected) {
+                        Write-Host "[⏏] Cartão $pendingDrive ejetado com segurança pelo sistema." -ForegroundColor Yellow
+                    }
+                } catch {
+                    Write-Host "[-] Erro na ingestão: $_" -ForegroundColor Red
+                }
+            }
+            
+            # 2. Monitor de cartões plugados
             try {
                 $currentReady = [System.IO.DriveInfo]::GetDrives() | Where-Object { $_.IsReady }
                 $currentSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
@@ -59,7 +74,7 @@ try {
                     
                     if (-not $knownDrives.Contains($driveName)) {
                         Write-Host "`n[+] NOVO DISPOSITIVO DETECTADO: $driveName ($($d.VolumeLabel))" -ForegroundColor Cyan
-                        Start-Sleep -Milliseconds 1500
+                        Start-Sleep -Milliseconds 1200
                         
                         $isCandidate = $false
                         $dcim = Join-Path $driveName "DCIM"
@@ -69,29 +84,28 @@ try {
                         }
                         
                         if ((Test-Path $dcim) -or (Test-Path $fotografoTxt) -or ($photos -and $photos.Count -gt 0)) {
-                            Write-Host "[!] Cartão fotográfico reconhecido! Iniciando ingestão..." -ForegroundColor Green
-                            [System.Threading.ThreadPool]::QueueUserWorkItem({
-                                param($src)
-                                Start-StationIngestProcess -SourceDrive $src
-                            }, $driveName) | Out-Null
+                            Write-Host "[!] Cartão fotográfico reconhecido! Iniciando ingestão automática..." -ForegroundColor Green
+                            $res = Start-StationIngestProcess -SourceDrive $driveName -AutoEject $cfg.AutoEject
+                            if ($res.Ejected) {
+                                Write-Host "[⏏] Cartão $driveName ejetado com segurança. Pode retirar." -ForegroundColor Yellow
+                            }
                         }
                         
                         [void]$knownDrives.Add($driveName)
                     }
                 }
                 
-                # Dispositivos removidos
+                # Remoção de cartões
                 $removed = [System.Collections.Generic.List[string]]::new()
                 foreach ($k in $knownDrives) {
                     if (-not $currentSet.Contains($k)) { $removed.Add($k) }
                 }
                 foreach ($rem in $removed) {
-                    Write-Host "[-] Dispositivo desconectado: $rem" -ForegroundColor Yellow
+                    Write-Host "[-] Dispositivo desconectado: $rem" -ForegroundColor DarkGray
                     [void]$knownDrives.Remove($rem)
                 }
             } catch {}
             
-            # Pequena pausa para evitar 100% de CPU
             Start-Sleep -Milliseconds 250
         }
         

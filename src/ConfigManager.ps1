@@ -24,6 +24,7 @@ function Get-StationConfig {
         EventName          = "Evento_" + (Get-Date -Format "yyyy-MM-dd")
         SafeSpaceBufferGB  = 10
         BuzzerEnabled      = $true
+        AutoEject          = $true
         Port               = 8080
         LastUpdated        = (Get-Date -Format "o")
     }
@@ -37,6 +38,7 @@ function Get-StationConfig {
             if ($loaded.EventName) { $defaultConfig.EventName = $loaded.EventName }
             if ($null -ne $loaded.SafeSpaceBufferGB) { $defaultConfig.SafeSpaceBufferGB = [int]$loaded.SafeSpaceBufferGB }
             if ($null -ne $loaded.BuzzerEnabled) { $defaultConfig.BuzzerEnabled = [bool]$loaded.BuzzerEnabled }
+            if ($null -ne $loaded.AutoEject) { $defaultConfig.AutoEject = [bool]$loaded.AutoEject }
             if ($loaded.Port) { $defaultConfig.Port = [int]$loaded.Port }
             if ($loaded.LastUpdated) { $defaultConfig.LastUpdated = $loaded.LastUpdated }
             

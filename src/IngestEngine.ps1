@@ -1,4 +1,5 @@
-# Suporte a extensões fotográficas e de vídeo profissionais
+# IngestEngine.ps1 - Motor de Ingestão de Alta Confiabilidade DIT
+
 $script:SUPPORTED_EXTENSIONS = @(
     ".CR2", ".CR3",        # Canon RAW
     ".ARW",                # Sony RAW
@@ -42,39 +43,45 @@ function Get-CardIdentifier {
     
     $cleanPath = $DriveLetter.TrimEnd("\")
     
-    # 1. Checa se o fotógrafo colocou um arquivo com o nome dele na raiz
-    $nameFiles = @(
-        (Join-Path $cleanPath "fotografo.txt"),
-        (Join-Path $cleanPath "photographer.txt"),
-        (Join-Path $cleanPath "camera.txt")
-    )
-    foreach ($nf in $nameFiles) {
-        if (Test-Path $nf) {
-            $name = (Get-Content $nf -TotalCount 1).Trim()
-            if (![string]::IsNullOrWhiteSpace($name)) {
-                return ($name -replace '[\\/:*?"<>|]', '_')
+    # 1. Procura fotografo.txt na pasta e em todos os diretórios pais (até a raiz do cartão)
+    try {
+        $curr = [System.IO.DirectoryInfo]::new($cleanPath)
+        while ($curr -ne $null) {
+            $nameFiles = @(
+                (Join-Path $curr.FullName "fotografo.txt"),
+                (Join-Path $curr.FullName "photographer.txt"),
+                (Join-Path $curr.FullName "camera.txt")
+            )
+            foreach ($nf in $nameFiles) {
+                if (Test-Path $nf) {
+                    $name = (Get-Content $nf -TotalCount 1).Trim()
+                    if (![string]::IsNullOrWhiteSpace($name)) {
+                        return ($name -replace '[\\/:*?"<>|]', '_')
+                    }
+                }
             }
+            $curr = $curr.Parent
         }
+    } catch {}
+    
+    # 2. Se for uma unidade física com etiqueta de volume (ex: EOS_DIGITAL)
+    $driveRoot = [System.IO.Path]::GetPathRoot($DriveLetter)
+    if (![string]::IsNullOrWhiteSpace($driveRoot)) {
+        $cleanLetter = $driveRoot.TrimEnd(":\")
+        try {
+            $vol = Get-Volume -DriveLetter $cleanLetter -ErrorAction SilentlyContinue
+            if ($vol -and ![string]::IsNullOrWhiteSpace($vol.FileSystemLabel) -and $vol.FileSystemLabel -notmatch "^(NO_NAME|UNTITLED|VOLUME)$") {
+                return ($vol.FileSystemLabel -replace '[\\/:*?"<>|]', '_')
+            }
+            if ($vol -and ![string]::IsNullOrWhiteSpace($vol.SerialNumber)) {
+                return "Cartao_$($vol.SerialNumber)"
+            }
+        } catch {}
     }
     
-    # Se for uma letra de drive (ex: "E:" ou "E")
-    if ($cleanPath -match '^[A-Za-z]:?$') {
-        $cleanLetter = $cleanPath.TrimEnd(":")
-        $vol = Get-Volume -DriveLetter $cleanLetter -ErrorAction SilentlyContinue
-        
-        if ($vol -and ![string]::IsNullOrWhiteSpace($vol.FileSystemLabel) -and $vol.FileSystemLabel -notmatch "^(NO_NAME|EOS_DIGITAL|UNTITLED|VOLUME)$") {
-            return ($vol.FileSystemLabel -replace '[\\/:*?"<>|]', '_')
-        }
-        
-        if ($vol -and ![string]::IsNullOrWhiteSpace($vol.SerialNumber)) {
-            return "Cartao_$($vol.SerialNumber)"
-        }
-        return "Cartao_Drive_$cleanLetter"
-    }
-    
-    # Se for uma pasta (em testes ou em rede)
+    # 3. Fallback para nome da pasta
     $folderName = [System.IO.Path]::GetFileName($cleanPath)
-    if (![string]::IsNullOrWhiteSpace($folderName)) {
+    if (![string]::IsNullOrWhiteSpace($folderName) -and $folderName -notmatch '^[A-Za-z]:?$') {
         return $folderName
     }
     
@@ -116,6 +123,55 @@ function Test-PreFlightDiskSpace {
     }
 }
 
+function Invoke-SafeCardEject {
+    param([Parameter(Mandatory=$true)][string]$DriveOrPath)
+    
+    $root = [System.IO.Path]::GetPathRoot($DriveOrPath)
+    if ([string]::IsNullOrWhiteSpace($root)) {
+        return @{ Success = $false; Message = "Caminho inválido para ejeção: $DriveOrPath" }
+    }
+    
+    $cleanRoot = $root.TrimEnd('\') + '\'
+    
+    try {
+        $sa = New-Object -ComObject Shell.Application
+        $drives = $sa.Namespace(17) # ssfDRIVES
+        if ($null -eq $drives) {
+            return @{ Success = $false; Message = "Não foi possível acessar o Shell do Windows." }
+        }
+        
+        foreach ($item in $drives.Items()) {
+            if ($item.Path.Equals($cleanRoot, [System.StringComparison]::OrdinalIgnoreCase) -or 
+                $item.Path.Equals($cleanRoot.TrimEnd('\'), [System.StringComparison]::OrdinalIgnoreCase)) {
+                
+                foreach ($verb in $item.Verbs()) {
+                    $cleanVerb = ($verb.Name -replace '&', '').Trim()
+                    if ($cleanVerb -match '^(Ejetar|Eject)$') {
+                        $verb.DoIt()
+                        return @{
+                            Success = $true
+                            Drive = $cleanRoot
+                            Message = "Cartão $cleanRoot ejetado com sucesso."
+                        }
+                    }
+                }
+                
+                $item.InvokeVerb("Eject")
+                return @{
+                    Success = $true
+                    Drive = $cleanRoot
+                    Message = "Comando de ejeção enviado para $cleanRoot."
+                }
+            }
+        }
+        
+        return @{ Success = $false; Message = "Unidade $cleanRoot não encontrada para ejeção." }
+    }
+    catch {
+        return @{ Success = $false; Message = "Erro ao ejetar unidade $cleanRoot : $_" }
+    }
+}
+
 function Emit-IngestSound {
     param([ValidateSet("Start", "Success", "Error")][string]$Type)
     
@@ -143,6 +199,7 @@ function Invoke-CardIngest {
         [Parameter(Mandatory=$true)][string]$SourceDrive,
         [Parameter(Mandatory=$true)][string]$DestinationFolder,
         [Parameter(Mandatory=$false)][string]$EventName = "Evento_Geral",
+        [Parameter(Mandatory=$false)][bool]$AutoEject = $false,
         [Parameter(Mandatory=$false)][scriptblock]$ProgressCallback = $null
     )
     
@@ -150,7 +207,7 @@ function Invoke-CardIngest {
     $cleanSource = $SourceDrive.TrimEnd("\") + "\"
     
     if (!(Test-Path $cleanSource)) {
-        throw "Drive de origem não encontrado ou indisponível: $cleanSource"
+        throw "Drive ou pasta de origem não encontrada ou inacessível: $cleanSource"
     }
     
     $cardId = Get-CardIdentifier -DriveLetter $cleanSource
@@ -201,16 +258,24 @@ function Invoke-CardIngest {
     
     if ($filesToCopy.Count -eq 0) {
         Emit-IngestSound -Type "Success"
+        
+        $ejectResult = $null
+        if ($AutoEject) {
+            $ejectResult = Invoke-SafeCardEject -DriveOrPath $cleanSource
+        }
+        
         return @{
-            Status = "IDLE_NO_NEW_FILES"
-            TotalFound = $allFiles.Count
-            CopiedCount = 0
-            SkippedCount = $skippedCount
+            Status           = "IDLE_NO_NEW_FILES"
+            TotalFound       = $allFiles.Count
+            CopiedCount      = 0
+            SkippedCount     = $skippedCount
             TotalBytesCopied = 0
-            CardIdentifier = $cardId
-            Destination = $finalDestination
-            DurationSeconds = 0
-            Errors = @()
+            CardIdentifier   = $cardId
+            Destination      = $finalDestination
+            DurationSeconds  = 0
+            Errors           = @()
+            Ejected          = ($ejectResult -and $ejectResult.Success)
+            EjectMessage     = if ($ejectResult) { $ejectResult.Message } else { "" }
         }
     }
     
@@ -262,12 +327,12 @@ function Invoke-CardIngest {
             [System.IO.File]::Move($stagingFile, $targetFile)
             
             $ledgerEntry = [ordered]@{
-                timestamp_utc = [System.DateTime]::UtcNow.ToString("o")
+                timestamp_utc   = [System.DateTime]::UtcNow.ToString("o")
                 card_identifier = $cardId
-                relative_path = $relPath
-                bytes = $srcFile.Length
-                sha256 = $srcHash
-                status = "VERIFIED_OK"
+                relative_path   = $relPath
+                bytes           = $srcFile.Length
+                sha256          = $srcHash
+                status          = "VERIFIED_OK"
             }
             $jsonLine = $ledgerEntry | ConvertTo-Json -Compress
             [System.IO.File]::AppendAllLines($manifestPath, [string[]]@($jsonLine), [System.Text.Encoding]::UTF8)
@@ -278,10 +343,10 @@ function Invoke-CardIngest {
             if ($ProgressCallback) {
                 & $ProgressCallback @{
                     CurrentIndex = $i + 1
-                    TotalFiles = $filesToCopy.Count
-                    CurrentFile = $srcFile.Name
-                    BytesCopied = $bytesTransferred
-                    TotalBytes = $totalNewBytes
+                    TotalFiles   = $filesToCopy.Count
+                    CurrentFile  = $srcFile.Name
+                    BytesCopied  = $bytesTransferred
+                    TotalBytes   = $totalNewBytes
                 }
             }
         }
@@ -294,12 +359,13 @@ function Invoke-CardIngest {
             }
             
             $failEntry = [ordered]@{
-                timestamp_utc = [System.DateTime]::UtcNow.ToString("o")
+                timestamp_utc   = [System.DateTime]::UtcNow.ToString("o")
                 card_identifier = $cardId
-                relative_path = $relPath
-                bytes = $srcFile.Length
-                error = "$_"
-                status = "FAILED"
+                relative_path   = $relPath
+                bytes           = $srcFile.Length
+                sha256          = ""
+                status          = "FAILED_COPY"
+                error           = $_.ToString()
             }
             $jsonLine = $failEntry | ConvertTo-Json -Compress
             [System.IO.File]::AppendAllLines($manifestPath, [string[]]@($jsonLine), [System.Text.Encoding]::UTF8)
@@ -311,21 +377,26 @@ function Invoke-CardIngest {
     
     if ($errors.Count -eq 0) {
         Emit-IngestSound -Type "Success"
-        $status = "SUCCESS_ALL_VERIFIED"
     } else {
         Emit-IngestSound -Type "Error"
-        $status = "COMPLETED_WITH_ERRORS"
+    }
+    
+    $ejectResult = $null
+    if ($AutoEject -and $errors.Count -eq 0) {
+        $ejectResult = Invoke-SafeCardEject -DriveOrPath $cleanSource
     }
     
     return @{
-        Status = $status
-        TotalFound = $allFiles.Count
-        CopiedCount = $copiedCount
-        SkippedCount = $skippedCount
+        Status           = if ($errors.Count -eq 0) { "SUCCESS_ALL_VERIFIED" } else { "COMPLETED_WITH_ERRORS" }
+        TotalFound       = $allFiles.Count
+        CopiedCount      = $copiedCount
+        SkippedCount     = $skippedCount
         TotalBytesCopied = $bytesTransferred
-        CardIdentifier = $cardId
-        Destination = $finalDestination
-        DurationSeconds = $duration
-        Errors = $errors
+        CardIdentifier   = $cardId
+        Destination      = $finalDestination
+        DurationSeconds  = $duration
+        Errors           = $errors.ToArray()
+        Ejected          = ($ejectResult -and $ejectResult.Success)
+        EjectMessage     = if ($ejectResult) { $ejectResult.Message } else { "" }
     }
 }

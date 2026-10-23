@@ -1,4 +1,4 @@
-﻿# WebServer.ps1 - Servidor HTTP e API da Estação de Ingestão DIT
+# WebServer.ps1 - Servidor HTTP e API da Estação de Ingestão DIT
 param(
     [int]$Port = 8080,
     [string]$PublicDir = (Join-Path $PSScriptRoot "public")
@@ -10,25 +10,28 @@ $configPath = Join-Path $PSScriptRoot "ConfigManager.ps1"
 if (Test-Path $enginePath) { . $enginePath }
 if (Test-Path $configPath) { . $configPath }
 
-# Estado Global em Memória
-$script:StationState = "IDLE"
+# Estado Global da Estação
+$script:StationState = "IDLE" # "IDLE" | "INGESTING" | "COMPLETED_EJECTED" | "ERROR"
 $script:ActiveCard = ""
 $script:FilesDone = 0
 $script:TotalFiles = 0
 $script:BytesDone = [int64]0
 $script:TotalBytes = [int64]0
 $script:CurrentFile = ""
+$script:StatusMessage = "Sistema Armado e Pronto"
 $script:IngestHistory = [System.Collections.Generic.List[PSObject]]::new()
 $script:IsProcessingIngest = $false
+$script:PendingIngestQueue = [System.Collections.Concurrent.ConcurrentQueue[string]]::new()
 
 function Start-StationIngestProcess {
     param(
-        [Parameter(Mandatory=$true)][string]$SourceDrive
+        [Parameter(Mandatory=$true)][string]$SourceDrive,
+        [Parameter(Mandatory=$false)][bool]$AutoEject = $true
     )
     
     if ($script:IsProcessingIngest) {
-        Write-Warning "Ingestão já em andamento. Ignorando solicitação duplicada para $SourceDrive"
-        return @{ Error = "Ingestão já em andamento" }
+        Write-Warning "Ingestao ja em andamento. Ignorando solicitacao para $SourceDrive"
+        return @{ Error = "Ingestao ja em andamento" }
     }
     
     $script:IsProcessingIngest = $true
@@ -38,14 +41,17 @@ function Start-StationIngestProcess {
     $script:TotalFiles = 0
     $script:BytesDone = [int64]0
     $script:TotalBytes = [int64]0
-    $script:CurrentFile = "Iniciando análise do cartão..."
+    $script:CurrentFile = "Analisando cartao..."
+    $script:StatusMessage = "Processando $SourceDrive..."
     
     $cfg = Get-StationConfig
+    $shouldEject = if ($null -ne $cfg.AutoEject) { [bool]$cfg.AutoEject } else { $true }
     
     try {
         $result = Invoke-CardIngest -SourceDrive $SourceDrive `
             -DestinationFolder $cfg.TargetRootPath `
             -EventName $cfg.EventName `
+            -AutoEject $shouldEject `
             -ProgressCallback {
                 param($p)
                 $script:FilesDone = $p.CurrentIndex
@@ -55,7 +61,6 @@ function Start-StationIngestProcess {
                 $script:TotalBytes = $p.TotalBytes
             }
         
-        # Registra no histórico da sessão
         $historyItem = [PSCustomObject]@{
             Timestamp       = (Get-Date -Format "o")
             CardIdentifier  = $result.CardIdentifier
@@ -63,12 +68,27 @@ function Start-StationIngestProcess {
             SkippedCount    = $result.SkippedCount
             BytesCopied     = $result.TotalBytesCopied
             Status          = $result.Status
+            Ejected         = $result.Ejected
         }
         $script:IngestHistory.Insert(0, $historyItem)
+        
+        if ($result.Ejected) {
+            $script:StationState = "COMPLETED_EJECTED"
+            $script:StatusMessage = "Backup concluido! Cartao ejetado com seguranca. Pode retirar."
+        } else {
+            $script:StationState = "IDLE"
+            $script:StatusMessage = "Ingestao concluida com sucesso."
+        }
+        
         return $result
     }
+    catch {
+        $script:StationState = "ERROR"
+        $script:StatusMessage = "Erro durante a ingestao: $_"
+        Write-Host "Erro em Start-StationIngestProcess: $_" -ForegroundColor Red
+        return @{ Error = $_.ToString() }
+    }
     finally {
-        $script:StationState = "IDLE"
         $script:IsProcessingIngest = $false
         $script:CurrentFile = ""
     }
@@ -79,22 +99,50 @@ function Start-IngestHttpServer {
     
     $listener = New-Object System.Net.HttpListener
     
-    # Tenta bind global (+). Se não for admin, usa localhost
-    $prefixAdded = $false
     try {
         $listener.Prefixes.Add("http://+:$ListenPort/")
         $listener.Start()
-        $prefixAdded = $true
-        Write-Host "Servidor Web Ativo em: http://+:$ListenPort/ (Acessível na rede local)" -ForegroundColor Green
+        Write-Host "Servidor Web Ativo em: http://+:$ListenPort/ (Rede Local)" -ForegroundColor Green
+        return $listener
     }
     catch {
         $listener = New-Object System.Net.HttpListener
+        $listener.Prefixes.Add("http://127.0.0.1:$ListenPort/")
         $listener.Prefixes.Add("http://localhost:$ListenPort/")
         $listener.Start()
         Write-Host "Servidor Web Ativo em: http://localhost:$ListenPort/" -ForegroundColor Yellow
+        return $listener
     }
+}
+
+function Invoke-FolderPickerModal {
+    param([string]$Title = "Selecione uma Pasta")
     
-    return $listener
+    $selected = ""
+    $thread = [System.Threading.Thread]::new([System.Threading.ThreadStart]{
+        Add-Type -AssemblyName System.Windows.Forms
+        $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+        $dialog.Description = $Title
+        $dialog.ShowNewFolderButton = $true
+        
+        $f = New-Object System.Windows.Forms.Form
+        $f.TopMost = $true
+        $f.WindowState = [System.Windows.Forms.FormWindowState]::Minimized
+        $f.Show()
+        $f.BringToFront()
+        
+        if ($dialog.ShowDialog($f) -eq [System.Windows.Forms.DialogResult]::OK) {
+            $selected = $dialog.SelectedPath
+        }
+        $f.Close()
+        $f.Dispose()
+        $dialog.Dispose()
+    })
+    $thread.SetApartmentState([System.Threading.ApartmentState]::STA)
+    $thread.Start()
+    $thread.Join()
+    
+    return $selected
 }
 
 function Handle-HttpRequest {
@@ -106,7 +154,6 @@ function Handle-HttpRequest {
     $request = $Context.Request
     $response = $Context.Response
     
-    # Habilita CORS para facilidade de testes e integrações
     $response.AddHeader("Access-Control-Allow-Origin", "*")
     $response.AddHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
     $response.AddHeader("Access-Control-Allow-Headers", "Content-Type")
@@ -120,21 +167,21 @@ function Handle-HttpRequest {
     $path = $request.Url.AbsolutePath
     
     try {
-        # Rotas da API
         if ($path -eq "/api/status") {
             $cfg = Get-StationConfig
             $drives = @(Get-AvailableDrivesInfo)
             
             $payload = [ordered]@{
-                State       = $script:StationState
-                ActiveCard  = $script:ActiveCard
-                FilesDone   = $script:FilesDone
-                TotalFiles  = $script:TotalFiles
-                BytesDone   = $script:BytesDone
-                TotalBytes  = $script:TotalBytes
-                CurrentFile = $script:CurrentFile
-                Config      = $cfg
-                Drives      = @($drives)
+                State         = $script:StationState
+                ActiveCard    = $script:ActiveCard
+                FilesDone     = $script:FilesDone
+                TotalFiles    = $script:TotalFiles
+                BytesDone     = $script:BytesDone
+                TotalBytes    = $script:TotalBytes
+                CurrentFile   = $script:CurrentFile
+                StatusMessage = $script:StatusMessage
+                Config        = $cfg
+                Drives        = @($drives)
             }
             
             $json = $payload | ConvertTo-Json -Depth 5
@@ -146,6 +193,22 @@ function Handle-HttpRequest {
         elseif ($path -eq "/api/drives") {
             $drives = @(Get-AvailableDrivesInfo)
             $json = $drives | ConvertTo-Json -Depth 3
+            $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
+            $response.ContentType = "application/json; charset=utf-8"
+            $response.ContentLength64 = $buffer.Length
+            $response.OutputStream.Write($buffer, 0, $buffer.Length)
+        }
+        elseif ($path -eq "/api/browse-folder") {
+            $title = if ($request.QueryString["type"] -eq "source") { 
+                "Selecione o Cartao ou Pasta de Fotos (Origem)" 
+            } else { 
+                "Selecione a Pasta onde deseja Salvar os Backups" 
+            }
+            
+            $picked = Invoke-FolderPickerModal -Title $title
+            
+            $resPayload = @{ SelectedPath = $picked }
+            $json = $resPayload | ConvertTo-Json
             $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
             $response.ContentType = "application/json; charset=utf-8"
             $response.ContentLength64 = $buffer.Length
@@ -164,6 +227,7 @@ function Handle-HttpRequest {
             if ($updates.EventName) { $ht["EventName"] = $updates.EventName }
             if ($null -ne $updates.SafeSpaceBufferGB) { $ht["SafeSpaceBufferGB"] = [int]$updates.SafeSpaceBufferGB }
             if ($null -ne $updates.BuzzerEnabled) { $ht["BuzzerEnabled"] = [bool]$updates.BuzzerEnabled }
+            if ($null -ne $updates.AutoEject) { $ht["AutoEject"] = [bool]$updates.AutoEject }
             
             $saved = Set-StationConfig -Config $ht
             $json = $saved | ConvertTo-Json -Depth 4
@@ -193,24 +257,31 @@ function Handle-HttpRequest {
             $payload = $body | ConvertFrom-Json
             
             if (!$payload.SourceDrive) {
-                $errBytes = [System.Text.Encoding]::UTF8.GetBytes('{"Error":"Drive de origem não especificado"}')
+                $errObj = @{ Error = "Drive ou pasta de origem nao especificado." }
+                $errJson = $errObj | ConvertTo-Json
+                $errBytes = [System.Text.Encoding]::UTF8.GetBytes($errJson)
                 $response.StatusCode = 400
+                $response.ContentType = "application/json; charset=utf-8"
                 $response.OutputStream.Write($errBytes, 0, $errBytes.Length)
-            } else {
-                # Executa a ingestão em background ou thread separada
-                [System.Threading.ThreadPool]::QueueUserWorkItem({
-                    param($src)
-                    Start-StationIngestProcess -SourceDrive $src
-                }, $payload.SourceDrive) | Out-Null
+            }
+            elseif (!(Test-Path $payload.SourceDrive)) {
+                $errObj = @{ Error = "O caminho especificado nao existe ou nao esta acessivel: $($payload.SourceDrive)" }
+                $errJson = $errObj | ConvertTo-Json
+                $errBytes = [System.Text.Encoding]::UTF8.GetBytes($errJson)
+                $response.StatusCode = 400
+                $response.ContentType = "application/json; charset=utf-8"
+                $response.OutputStream.Write($errBytes, 0, $errBytes.Length)
+            }
+            else {
+                $script:PendingIngestQueue.Enqueue($payload.SourceDrive)
                 
-                $okBytes = [System.Text.Encoding]::UTF8.GetBytes('{"Status":"INGEST_STARTED"}')
+                $okBytes = [System.Text.Encoding]::UTF8.GetBytes('{"Status":"INGEST_STARTED","Message":"Ingestao colocada na fila com sucesso"}')
                 $response.ContentType = "application/json; charset=utf-8"
                 $response.ContentLength64 = $okBytes.Length
                 $response.OutputStream.Write($okBytes, 0, $okBytes.Length)
             }
         }
         else {
-            # Arquivos estáticos
             $reqFile = if ($path -eq "/" -or [string]::IsNullOrWhiteSpace($path)) { "index.html" } else { $path.TrimStart("/") }
             $fullFilePath = [System.IO.Path]::Combine($PublicFolder, $reqFile)
             
@@ -234,6 +305,7 @@ function Handle-HttpRequest {
         $response.StatusCode = 500
         $errMsg = "500 Internal Error: $_"
         $errBytes = [System.Text.Encoding]::UTF8.GetBytes($errMsg)
+        $response.ContentType = "text/plain; charset=utf-8"
         $response.OutputStream.Write($errBytes, 0, $errBytes.Length)
     }
     finally {
