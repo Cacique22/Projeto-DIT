@@ -4,8 +4,18 @@ try {
     Add-Type -AssemblyName System.Drawing
 } catch {}
 
-$enginePath = Join-Path $PSScriptRoot "IngestEngine.ps1"
-$configPath = Join-Path $PSScriptRoot "ConfigManager.ps1"
+$scriptDir = if (![string]::IsNullOrWhiteSpace($PSScriptRoot)) {
+    $PSScriptRoot
+} elseif ($MyInvocation.MyCommand -and ![string]::IsNullOrWhiteSpace($MyInvocation.MyCommand.Path)) {
+    Split-Path -Parent $MyInvocation.MyCommand.Path
+} elseif (Test-Path "C:\auto-ingest-station\src") {
+    "C:\auto-ingest-station\src"
+} else {
+    (Get-Location).Path
+}
+
+$enginePath = Join-Path $scriptDir "IngestEngine.ps1"
+$configPath = Join-Path $scriptDir "ConfigManager.ps1"
 
 if (Test-Path $enginePath) { . $enginePath }
 if (Test-Path $configPath) { . $configPath }
