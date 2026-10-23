@@ -206,7 +206,8 @@ function Invoke-CardIngest {
         [Parameter(Mandatory=$false)][string]$EventName = "Evento_Geral",
         [Parameter(Mandatory=$false)][bool]$AutoEject = $false,
         [Parameter(Mandatory=$false)][scriptblock]$CancelCheck = $null,
-        [Parameter(Mandatory=$false)][scriptblock]$ProgressCallback = $null
+        [Parameter(Mandatory=$false)][scriptblock]$ProgressCallback = $null,
+        [Parameter(Mandatory=$false)][string]$CardPhotoSubfolder = ""
     )
     
     $startTime = [System.DateTime]::UtcNow
@@ -218,8 +219,19 @@ function Invoke-CardIngest {
     
     $cardId = Get-CardIdentifier -DriveLetter $cleanSource
     
-    # Se DestinationFolder já terminar com o cardId, usa diretamente; caso contrário compõe [Destino]\[Evento]\[CardId]
-    $finalDestination = if ($DestinationFolder.EndsWith($cardId, [System.StringComparison]::OrdinalIgnoreCase)) {
+    $searchRoot = $cleanSource
+    if (![string]::IsNullOrWhiteSpace($CardPhotoSubfolder) -and $CardPhotoSubfolder -ne "\ (Raiz do Cartão)") {
+        $cleanSub = $CardPhotoSubfolder.TrimStart('\').TrimEnd('\')
+        $combined = Join-Path $cleanSource $cleanSub
+        if (Test-Path $combined) {
+            $searchRoot = $combined.TrimEnd('\') + '\'
+        }
+    }
+    
+    # Se DestinationFolder já terminar com o cardId ou for um destino específico configurado, usa diretamente
+    $finalDestination = if ($DestinationFolder.EndsWith($cardId, [System.StringComparison]::OrdinalIgnoreCase) -or
+                            (Test-Path $DestinationFolder) -or
+                            $DestinationFolder.Contains($EventName)) {
         $DestinationFolder
     } else {
         [System.IO.Path]::Combine($DestinationFolder, $EventName, $cardId)
@@ -245,7 +257,7 @@ function Invoke-CardIngest {
         }
     }
     
-    $allFiles = Get-ChildItem -Path $cleanSource -Recurse -File -ErrorAction SilentlyContinue | Where-Object {
+    $allFiles = Get-ChildItem -Path $searchRoot -Recurse -File -ErrorAction SilentlyContinue | Where-Object {
         $script:SUPPORTED_EXTENSIONS -contains $_.Extension.ToUpper()
     }
     
@@ -254,7 +266,7 @@ function Invoke-CardIngest {
     $skippedCount = 0
     
     foreach ($file in $allFiles) {
-        $relPath = $file.FullName.Substring($cleanSource.Length)
+        $relPath = $file.FullName.Substring($searchRoot.Length)
         $destCandidate = [System.IO.Path]::Combine($finalDestination, $relPath)
         
         if ($idempotencyMap.ContainsKey($relPath) -and (Test-Path $destCandidate)) {
@@ -327,7 +339,7 @@ function Invoke-CardIngest {
         }
         
         $srcFile = $filesToCopy[$i]
-        $relPath = $srcFile.FullName.Substring($cleanSource.Length)
+        $relPath = $srcFile.FullName.Substring($searchRoot.Length)
         $targetFile = [System.IO.Path]::Combine($finalDestination, $relPath)
         $targetDir = [System.IO.Path]::GetDirectoryName($targetFile)
         $stagingFile = $targetFile + ".staging.tmp"

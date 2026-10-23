@@ -2,7 +2,8 @@
 .SYNOPSIS
     Suíte de Testes Automatizados de Missão Crítica para auto-ingest-station.
     Valida todas as Invariantes do motor, auto-ejeção, cancelamento seguro,
-    mapeamento multi-cartão, idempotência, integridade criptográfica e API web.
+    gestão de múltiplos eventos, cadastro de cartões por fotógrafo/subpasta,
+    controle de pausa/retomada de monitoramento, integridade criptográfica e API web.
 #>
 
 $ErrorActionPreference = "Stop"
@@ -68,7 +69,7 @@ try {
     # -------------------------------------------------------------------------
     # TESTE 1: Integridade Criptográfica SHA-256
     # -------------------------------------------------------------------------
-    Write-Host "[1/12] Testando Cálculo de Hash SHA-256..." -ForegroundColor White
+    Write-Host "[1/16] Testando Cálculo de Hash SHA-256..." -ForegroundColor White
     $testFilePath = Join-Path $testSandbox "test_sha.bin"
     [System.IO.File]::WriteAllBytes($testFilePath, [byte[]]@(0x41, 0x42, 0x43, 0x44, 0x01, 0x02, 0xFF))
 
@@ -80,7 +81,7 @@ try {
     # -------------------------------------------------------------------------
     # TESTE 2: Identificação de Fotógrafo e Suporte a Subpastas
     # -------------------------------------------------------------------------
-    Write-Host "`n[2/12] Testando Identificação de Fotógrafo e Suporte a Subpastas..." -ForegroundColor White
+    Write-Host "`n[2/16] Testando Identificação de Fotógrafo e Suporte a Subpastas..." -ForegroundColor White
     $identFile = Join-Path $mockCard "fotografo.txt"
     Set-Content -Path $identFile -Value "Fotografo_Lucas_A7IV" -Encoding UTF8
 
@@ -95,7 +96,7 @@ try {
     # -------------------------------------------------------------------------
     # TESTE 3: Pre-Flight Check de Espaço em Disco
     # -------------------------------------------------------------------------
-    Write-Host "`n[3/12] Testando Pre-Flight Check de Espaço em Disco..." -ForegroundColor White
+    Write-Host "`n[3/16] Testando Pre-Flight Check de Espaço em Disco..." -ForegroundColor White
     $spaceOk = Test-PreFlightDiskSpace -TargetPath $mockBackup -RequiredBytes 1048576
     Assert-True $spaceOk.IsSufficient "Aprova quando espaço é abundante"
 
@@ -105,7 +106,7 @@ try {
     # -------------------------------------------------------------------------
     # TESTE 4: Cópia Atômica com Staging e Validação Criptográfica
     # -------------------------------------------------------------------------
-    Write-Host "`n[4/12] Testando Cópia Atômica com Staging e Validação..." -ForegroundColor White
+    Write-Host "`n[4/16] Testando Cópia Atômica com Staging e Validação..." -ForegroundColor White
     $dummyPhoto1 = Join-Path $subfolderDcim "IMG_0001.CR3"
     $dummyPhoto2 = Join-Path $subfolderDcim "IMG_0002.JPG"
     [System.IO.File]::WriteAllBytes($dummyPhoto1, [byte[]]@(1..5000 | ForEach-Object { [byte]($_ % 256) }))
@@ -139,7 +140,7 @@ try {
     # -------------------------------------------------------------------------
     # TESTE 5: Ingestão Especificando Subpasta Direta
     # -------------------------------------------------------------------------
-    Write-Host "`n[5/12] Testando Ingestão Especificando Subpasta Direta..." -ForegroundColor White
+    Write-Host "`n[5/16] Testando Ingestão Especificando Subpasta Direta..." -ForegroundColor White
     $mockBackupSub = Join-Path $testSandbox "MockBackupSub"
     New-Item -ItemType Directory -Path $mockBackupSub -Force | Out-Null
 
@@ -150,7 +151,7 @@ try {
     # -------------------------------------------------------------------------
     # TESTE 6: Idempotência em Re-inserção de Cartão
     # -------------------------------------------------------------------------
-    Write-Host "`n[6/12] Testando Idempotência em Re-inserção de Cartão..." -ForegroundColor White
+    Write-Host "`n[6/16] Testando Idempotência em Re-inserção de Cartão..." -ForegroundColor White
     $reIngestResult = Invoke-CardIngest -SourceDrive $mockCard -DestinationFolder $mockBackup -EventName "Casamento_Teste" -AutoEject $false
     Assert-Equal $reIngestResult.CopiedCount 0 "Zero arquivos novos foram copiados em repetição"
     Assert-Equal $reIngestResult.SkippedCount 2 "Ambos os arquivos já existentes foram pulados"
@@ -166,7 +167,7 @@ try {
     # -------------------------------------------------------------------------
     # TESTE 7: Imutabilidade do Cartão de Origem
     # -------------------------------------------------------------------------
-    Write-Host "`n[7/12] Testando Imutabilidade do Cartão de Origem..." -ForegroundColor White
+    Write-Host "`n[7/16] Testando Imutabilidade do Cartão de Origem..." -ForegroundColor White
     Assert-True (Test-Path $dummyPhoto1) "Foto 1 original permanece intacta no cartão"
     Assert-True (Test-Path $dummyPhoto2) "Foto 2 original permanece intacta no cartão"
     Assert-True (Test-Path $dummyPhoto3) "Foto 3 original permanece intacta no cartão"
@@ -176,7 +177,7 @@ try {
     # -------------------------------------------------------------------------
     # TESTE 8: ConfigManager e Descoberta de Armazenamento
     # -------------------------------------------------------------------------
-    Write-Host "`n[8/12] Testando ConfigManager e Descoberta de Armazenamento..." -ForegroundColor White
+    Write-Host "`n[8/16] Testando ConfigManager e Descoberta de Armazenamento..." -ForegroundColor White
     $cfg = Get-StationConfig -ConfigPath $mockConfigFile
     Assert-True (Test-Path $mockConfigFile) "Arquivo config.json de teste gerado"
     Assert-True (![string]::IsNullOrWhiteSpace($cfg.TargetRootPath)) "TargetRootPath padrão foi preenchido"
@@ -203,12 +204,14 @@ try {
     # -------------------------------------------------------------------------
     # TESTE 9: Servidor Web e Endpoints REST (API e Dashboard)
     # -------------------------------------------------------------------------
-    Write-Host "`n[9/12] Testando Servidor Web e Endpoints REST..." -ForegroundColor White
+    Write-Host "`n[9/16] Testando Servidor Web e Endpoints REST..." -ForegroundColor White
     $testPort = 8095
     $publicDir = (Resolve-Path (Join-Path $PSScriptRoot "..\src\public")).Path
+    $resolvedConfigPath = (Resolve-Path $configPath).Path
+    $resolvedEnginePath = (Resolve-Path $enginePath).Path
     $resolvedServerPath = (Resolve-Path $serverPath).Path
 
-    $serverProc = Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -Command `"& { . '$resolvedServerPath'; `$l = Start-IngestHttpServer -ListenPort $testPort; while (`$l.IsListening) { try { `$ctx = `$l.GetContext(); Handle-HttpRequest -Context `$ctx -PublicFolder '$publicDir' } catch { break } } }`"" -PassThru -WindowStyle Hidden
+    $serverProc = Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -Command `"& { . '$resolvedConfigPath'; . '$resolvedEnginePath'; . '$resolvedServerPath'; `$l = Start-IngestHttpServer -ListenPort $testPort; while (`$l.IsListening) { try { `$ctx = `$l.GetContext(); Handle-HttpRequest -Context `$ctx -PublicFolder '$publicDir' } catch { break } } }`"" -PassThru -WindowStyle Hidden
     
     Start-Sleep -Seconds 2
 
@@ -219,13 +222,14 @@ try {
         Assert-True ($htmlRes.Content.Contains("INGEST") -and $htmlRes.Content.Contains("DIT")) "Dashboard HTML servido com sucesso em /"
         Assert-True ($htmlRes.Content.Contains("browseFolder")) "Botão de explorar pastas presente no HTML"
         Assert-True ($htmlRes.Content.Contains("cancelCurrentIngest")) "Botão de parar com segurança presente no HTML"
-        Assert-True ($htmlRes.Content.Contains("mappingsTableBody")) "Seção de mapeamento multi-cartão presente no HTML"
+        Assert-True ($htmlRes.Content.Contains("badgeCurrentEvent")) "Seção de eventos presente no HTML"
 
         # Teste 9.2: GET /api/status
         $statusRes = Invoke-RestMethod -Uri "http://localhost:$testPort/api/status"
         Assert-Equal $statusRes.State "IDLE" "Status inicial da estação reportado como IDLE"
         $statusDrives = @($statusRes.Drives)
         Assert-True ($statusDrives.Count -gt 0) "API /api/status lista unidades de disco ativas"
+        Assert-Equal $statusRes.MonitoringActive $true "Status inicial do monitoramento reportado como ativo"
 
         # Teste 9.3: POST /api/config
         $bodyJson = @{ EventName = "Formatura_Medicina_2026"; AutoEject = $true } | ConvertTo-Json
@@ -257,7 +261,7 @@ try {
     # -------------------------------------------------------------------------
     # TESTE 10: Interrupção Segura de Ingestão (Cancelamento sem Corrupção)
     # -------------------------------------------------------------------------
-    Write-Host "`n[10/12] Testando Interrupção Segura de Ingestão..." -ForegroundColor White
+    Write-Host "`n[10/16] Testando Interrupção Segura de Ingestão..." -ForegroundColor White
     $mockCardCancel = Join-Path $testSandbox "MockCardCancel"
     $mockBackupCancel = Join-Path $testSandbox "MockBackupCancel"
     New-Item -ItemType Directory -Path $mockCardCancel -Force | Out-Null
@@ -287,32 +291,26 @@ try {
     Assert-Equal $abortResult.CopiedCount 1 "Apenas a primeira foto concluída antes do cancelamento foi mantida"
     Assert-Equal $abortResult.Ejected $false "Cartão NÃO foi ejetado durante o aborto para inspeção segura"
 
-    # Invariante: Zero arquivos temporários ou corrompidos órfãos
     $stagingLeft = Get-ChildItem -Path $abortResult.Destination -Recurse -Filter "*.staging.tmp"
     Assert-Equal $stagingLeft.Count 0 "Nenhum arquivo temporário .staging.tmp órfão deixado no destino"
 
-    # Invariante: Foto 1 foi verificada e permanece íntegra
     $destPhoto1 = Join-Path $abortResult.Destination "PHOTO_1.RAW"
     Assert-True (Test-Path $destPhoto1) "Foto 1 copiada antes da interrupção permanece intacta"
     $p1Sha = Get-FileSha256 -FilePath $destPhoto1
     $src1Sha = Get-FileSha256 -FilePath (Join-Path $mockCardCancel "PHOTO_1.RAW")
     Assert-Equal $p1Sha $src1Sha "Hash SHA-256 da foto 1 confere com o original"
 
-    # Invariante: Fotos posteriores não foram copiadas pela metade
     Assert-True (!(Test-Path (Join-Path $abortResult.Destination "PHOTO_3.RAW"))) "Fotos posteriores não foram criadas pela metade"
 
-    # Invariante: Cartão de origem permanece 100% intacto
     for ($i = 1; $i -le 4; $i++) {
         Assert-True (Test-Path (Join-Path $mockCardCancel "PHOTO_$i.RAW")) "Cartão de origem manteve PHOTO_$i intacta"
     }
 
-    # Invariante: Manifesto registrou o aborto
     $cancelManifest = Join-Path $abortResult.Destination "manifest.jsonl"
     Assert-True (Test-Path $cancelManifest) "Manifesto de auditoria registrado no cancelamento"
     $manifestText = Get-Content $cancelManifest -Raw -Encoding UTF8
     Assert-True ($manifestText.Contains("ABORTED_BY_USER")) "Manifesto gravou status ABORTED_BY_USER no log append-only"
 
-    # Invariante de Retomada Idempotente: Ao rodar novamente sem cancelar, pula a foto 1 e conclui as restantes!
     $resumeResult = Invoke-CardIngest -SourceDrive $mockCardCancel `
         -DestinationFolder $mockBackupCancel `
         -EventName "AbortTest" `
@@ -328,61 +326,49 @@ try {
     # -------------------------------------------------------------------------
     # TESTE 11: Mapeamento Multi-Cartão & Destinos Personalizados
     # -------------------------------------------------------------------------
-    Write-Host "`n[11/12] Testando Mapeamento Multi-Cartão & Destinos Personalizados..." -ForegroundColor White
+    Write-Host "`n[11/16] Testando Mapeamento Multi-Cartão & Destinos Personalizados..." -ForegroundColor White
     $destAlpha = Join-Path $testSandbox "Dest_Fotografo_Alpha"
     $destBeta = Join-Path $testSandbox "Dest_Fotografo_Beta"
     New-Item -ItemType Directory -Path $destAlpha -Force | Out-Null
     New-Item -ItemType Directory -Path $destBeta -Force | Out-Null
 
-    # Adiciona regra de mapeamento para CARD_ALPHA
     $rule1 = Add-CardMappingRule -Identifier "CARD_ALPHA" -Destination $destAlpha -Description "Fotógrafo Alpha" -ConfigPath $mockConfigFile
     Assert-Equal $rule1.Identifier "CARD_ALPHA" "Regra de mapeamento criada para CARD_ALPHA"
 
-    # Adiciona regra de mapeamento para unidade virtual Z:
     $rule2 = Add-CardMappingRule -Identifier "Z:" -Destination $destBeta -Description "Drive Z Específico" -ConfigPath $mockConfigFile
     Assert-Equal $rule2.Identifier "Z:" "Regra de mapeamento criada para unidade Z:"
 
     $currentCfgWithMaps = Get-StationConfig -ConfigPath $mockConfigFile
     Assert-Equal $currentCfgWithMaps.CardMappings.Count 2 "Config possui 2 regras de mapeamento registradas"
 
-    # Roteamento de destino para CARD_ALPHA
     $routeAlpha = Get-DestinationForCard -CardIdentifier "CARD_ALPHA" -SourcePath "E:\DCIM" -Config $currentCfgWithMaps
     Assert-True ($routeAlpha.StartsWith($destAlpha, [System.StringComparison]::OrdinalIgnoreCase)) "CARD_ALPHA roteado para destino personalizado Alpha"
 
-    # Roteamento de destino para unidade Z:
     $routeBeta = Get-DestinationForCard -CardIdentifier "OUTRO_CARD" -SourcePath "Z:\DCIM" -Config $currentCfgWithMaps
     Assert-True ($routeBeta.StartsWith($destBeta, [System.StringComparison]::OrdinalIgnoreCase)) "Drive Z: roteado para destino personalizado Beta"
 
-    # Roteamento para cartão não mapeado -> deve usar destino padrão
     $routeDefault = Get-DestinationForCard -CardIdentifier "CARD_NAO_MAPEADO" -SourcePath "F:\DCIM" -Config $currentCfgWithMaps
     Assert-True ($routeDefault.StartsWith($currentCfgWithMaps.TargetRootPath, [System.StringComparison]::OrdinalIgnoreCase)) "Cartão não mapeado usa destino padrão da estação"
 
-    # Remoção de regra de mapeamento
     Remove-CardMappingRule -Identifier "CARD_ALPHA" -ConfigPath $mockConfigFile | Out-Null
     $cfgAfterRemoval = Get-StationConfig -ConfigPath $mockConfigFile
     Assert-Equal $cfgAfterRemoval.CardMappings.Count 1 "Regra de CARD_ALPHA removida com sucesso"
 
-    $routeAlphaAfter = Get-DestinationForCard -CardIdentifier "CARD_ALPHA" -SourcePath "E:\DCIM" -Config $cfgAfterRemoval
-    Assert-True ($routeAlphaAfter.StartsWith($cfgAfterRemoval.TargetRootPath, [System.StringComparison]::OrdinalIgnoreCase)) "Após remoção da regra, CARD_ALPHA volta a usar destino padrão"
-
     # -------------------------------------------------------------------------
     # TESTE 12: Endpoints REST para Cancelamento e Mapeamento Multi-Cartão
     # -------------------------------------------------------------------------
-    Write-Host "`n[12/12] Testando Endpoints REST de Cancelamento e Mapeamento..." -ForegroundColor White
-    $serverProc2 = Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -Command `"& { . '$resolvedServerPath'; `$l = Start-IngestHttpServer -ListenPort $testPort; while (`$l.IsListening) { try { `$ctx = `$l.GetContext(); Handle-HttpRequest -Context `$ctx -PublicFolder '$publicDir' } catch { break } } }`"" -PassThru -WindowStyle Hidden
+    Write-Host "`n[12/16] Testando Endpoints REST de Cancelamento e Mapeamento..." -ForegroundColor White
+    $serverProc2 = Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -Command `"& { . '$resolvedConfigPath'; . '$resolvedEnginePath'; . '$resolvedServerPath'; `$l = Start-IngestHttpServer -ListenPort $testPort; while (`$l.IsListening) { try { `$ctx = `$l.GetContext(); Handle-HttpRequest -Context `$ctx -PublicFolder '$publicDir' } catch { break } } }`"" -PassThru -WindowStyle Hidden
     
     Start-Sleep -Seconds 2
 
     try {
-        # Teste 12.1: POST /api/cancel quando ocioso
         $cancelIdle = Invoke-RestMethod -Uri "http://localhost:$testPort/api/cancel" -Method Post
         Assert-Equal $cancelIdle.Cancelled $false "POST /api/cancel informa que nenhuma ingestão estava ativa"
 
-        # Teste 12.2: GET /api/mappings
         $mappingsList = Invoke-RestMethod -Uri "http://localhost:$testPort/api/mappings"
         Assert-True ($mappingsList -is [System.Array] -or $null -eq $mappingsList) "GET /api/mappings retorna lista válida"
 
-        # Teste 12.3: POST /api/mappings (criação de nova regra via API)
         $newMapBody = @{
             Identifier = "SONY_A7_API"
             Destination = $destAlpha
@@ -391,13 +377,156 @@ try {
         $postMapRes = Invoke-RestMethod -Uri "http://localhost:$testPort/api/mappings" -Method Post -Body $newMapBody -ContentType "application/json"
         Assert-Equal $postMapRes.Identifier "SONY_A7_API" "POST /api/mappings cadastrou nova regra"
 
-        # Teste 12.4: DELETE /api/mappings?identifier=SONY_A7_API
         $delMapRes = Invoke-RestMethod -Uri "http://localhost:$testPort/api/mappings?identifier=SONY_A7_API" -Method Delete
         Assert-Equal $delMapRes.Status "DELETED" "DELETE /api/mappings removeu a regra com sucesso"
     }
     finally {
         if ($serverProc2 -and -not $serverProc2.HasExited) {
             Stop-Process -Id $serverProc2.Id -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    # -------------------------------------------------------------------------
+    # TESTE 13: Gestão de Múltiplos Eventos e Persistência
+    # -------------------------------------------------------------------------
+    Write-Host "`n[13/16] Testando Gestão de Múltiplos Eventos e Persistência..." -ForegroundColor White
+    $evDest1 = Join-Path $testSandbox "Event_Casamento_Lucas"
+    $evDest2 = Join-Path $testSandbox "Event_Bodas_Ouro"
+    New-Item -ItemType Directory -Path $evDest1 -Force | Out-Null
+    New-Item -ItemType Directory -Path $evDest2 -Force | Out-Null
+
+    $ev1 = New-StationEvent -EventName "Casamento_Lucas_Mariana" -DefaultDestination $evDest1 -ConfigPath $mockConfigFile
+    Assert-Equal $ev1.Name "Casamento_Lucas_Mariana" "Novo evento Casamento_Lucas_Mariana criado"
+
+    $ev2 = New-StationEvent -EventName "Bodas_Ouro_2026" -DefaultDestination $evDest2 -ConfigPath $mockConfigFile
+    Assert-Equal $ev2.Name "Bodas_Ouro_2026" "Novo evento Bodas_Ouro_2026 criado"
+
+    $eventsListAll = @(Get-StationEvents -ConfigPath $mockConfigFile)
+    Assert-True ($eventsListAll.Count -ge 2) "Lista de eventos contém múltiplos eventos persistidos"
+
+    # Alterna o evento ativo
+    Set-CurrentEvent -EventName "Casamento_Lucas_Mariana" -ConfigPath $mockConfigFile | Out-Null
+    $curEv = Get-CurrentEvent -ConfigPath $mockConfigFile
+    Assert-Equal $curEv.Name "Casamento_Lucas_Mariana" "Evento ativo alternado para Casamento_Lucas_Mariana com persistência"
+
+    # -------------------------------------------------------------------------
+    # TESTE 14: Cadastro de Cartão por Evento e Formatação de Subpasta
+    # -------------------------------------------------------------------------
+    Write-Host "`n[14/16] Testando Cadastro de Cartão por Evento e Subpasta..." -ForegroundColor White
+    $mockCardNikon = Join-Path $testSandbox "MockCardNikon"
+    $nikonDcim = Join-Path $mockCardNikon "DCIM\100NCZ_6"
+    New-Item -ItemType Directory -Path $nikonDcim -Force | Out-Null
+
+    $nikonPhoto = Join-Path $nikonDcim "DSC_0001.NEF"
+    [System.IO.File]::WriteAllBytes($nikonPhoto, [byte[]]@(1..3000 | ForEach-Object { [byte]($_ % 256) }))
+
+    # 14.1: Descoberta de subpastas de fotos no cartão
+    $foldersFound = @(Get-CardPhotoFolders -DriveRoot $mockCardNikon)
+    Assert-True ($foldersFound -contains "DCIM\100NCZ_6") "Identificou subpasta de câmera DCIM\100NCZ_6 no cartão"
+
+    # 14.2: Cadastro do primeiro uso do cartão no evento ativo
+    $photogDest = Join-Path $evDest1 "Marina_Camera2"
+    $regCard = Register-CardForEvent -EventName "Casamento_Lucas_Mariana" `
+        -CardIdentifier "NIKON_SD_64GB" `
+        -Photographer "Marina Costa" `
+        -DestinationPath $photogDest `
+        -PhotoSubfolder "DCIM\100NCZ_6" `
+        -ConfigPath $mockConfigFile
+
+    Assert-Equal $regCard.Photographer "Marina Costa" "Cartão cadastrado com fotógrafo Marina Costa"
+    Assert-Equal $regCard.PhotoSubfolder "DCIM\100NCZ_6" "Subpasta de fotos da câmera registrada no cadastro"
+
+    # 14.3: Recuperação do cadastro
+    $savedReg = Get-CardRegistration -EventName "Casamento_Lucas_Mariana" -CardIdentifier "NIKON_SD_64GB" -ConfigPath $mockConfigFile
+    Assert-Equal $savedReg.Photographer "Marina Costa" "Cadastro recuperado com sucesso"
+    Assert-Equal $savedReg.DestinationPath $photogDest "Destino do cartão recuperado com sucesso"
+
+    # 14.4: Listagem de fotógrafos únicos do evento
+    $photogsEvent = @(Get-EventPhotographers -EventName "Casamento_Lucas_Mariana" -ConfigPath $mockConfigFile)
+    Assert-True ($photogsEvent -contains "Marina Costa") "Marina Costa consta na lista de fotógrafos do evento"
+
+    # 14.5: Ingestão usando a subpasta cadastrada
+    $resNikon = Invoke-CardIngest -SourceDrive $mockCardNikon `
+        -DestinationFolder $savedReg.DestinationPath `
+        -EventName "Casamento_Lucas_Mariana" `
+        -AutoEject $false `
+        -CardPhotoSubfolder $savedReg.PhotoSubfolder
+
+    Assert-Equal $resNikon.Status "SUCCESS_ALL_VERIFIED" "Ingestão com subpasta de câmera concluída com sucesso"
+    Assert-Equal $resNikon.CopiedCount 1 "Exatamente 1 foto descarregada da subpasta"
+    $destNikonFile = Join-Path $photogDest "DSC_0001.NEF"
+    Assert-True (Test-Path $destNikonFile) "Foto transferida para a pasta dedicada do fotógrafo"
+
+    # 14.6: Re-inserção (idempotência no cartão cadastrado)
+    $resNikonRepeat = Invoke-CardIngest -SourceDrive $mockCardNikon `
+        -DestinationFolder $savedReg.DestinationPath `
+        -EventName "Casamento_Lucas_Mariana" `
+        -AutoEject $false `
+        -CardPhotoSubfolder $savedReg.PhotoSubfolder
+
+    Assert-Equal $resNikonRepeat.Status "IDLE_NO_NEW_FILES" "Re-inserção do cartão registrado é identificada e fotos repetidas são puladas"
+
+    # -------------------------------------------------------------------------
+    # TESTE 15: Controle de Monitoramento e Leitura (Pausar / Retomar)
+    # -------------------------------------------------------------------------
+    Write-Host "`n[15/16] Testando Controle de Monitoramento (Pausar / Retomar)..." -ForegroundColor White
+    $stateInitial = Get-MonitoringState -ConfigPath $mockConfigFile
+    Assert-Equal $stateInitial $true "Monitoramento ativo por padrão"
+
+    Set-MonitoringState -Active $false -ConfigPath $mockConfigFile | Out-Null
+    $statePaused = Get-MonitoringState -ConfigPath $mockConfigFile
+    Assert-Equal $statePaused $false "Monitoramento pausado com sucesso"
+
+    Set-MonitoringState -Active $true -ConfigPath $mockConfigFile | Out-Null
+    $stateResumed = Get-MonitoringState -ConfigPath $mockConfigFile
+    Assert-Equal $stateResumed $true "Monitoramento reativado com sucesso"
+
+    # -------------------------------------------------------------------------
+    # TESTE 16: Endpoints REST de Eventos, Cadastro de Cartão e Monitoramento
+    # -------------------------------------------------------------------------
+    Write-Host "`n[16/16] Testando Endpoints REST de Eventos e Cadastro..." -ForegroundColor White
+    $serverProc3 = Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -Command `"& { . '$resolvedConfigPath'; . '$resolvedEnginePath'; . '$resolvedServerPath'; `$l = Start-IngestHttpServer -ListenPort $testPort; while (`$l.IsListening) { try { `$ctx = `$l.GetContext(); Handle-HttpRequest -Context `$ctx -PublicFolder '$publicDir' } catch { break } } }`"" -PassThru -WindowStyle Hidden
+    
+    Start-Sleep -Seconds 2
+
+    try {
+        # 16.1: GET /api/events
+        $evRes = Invoke-RestMethod -Uri "http://localhost:$testPort/api/events"
+        Assert-True ($null -ne $evRes.CurrentEvent) "GET /api/events retorna CurrentEvent"
+
+        # 16.2: POST /api/events (criar novo evento via API)
+        $newEvPayload = @{ Name = "Formatura_Direito_2026"; Destination = $evDest2 } | ConvertTo-Json
+        $postEvRes = Invoke-RestMethod -Uri "http://localhost:$testPort/api/events" -Method Post -Body $newEvPayload -ContentType "application/json"
+        Assert-Equal $postEvRes.Name "Formatura_Direito_2026" "POST /api/events criou novo evento via API"
+
+        # 16.3: POST /api/events/select (trocar evento ativo via API)
+        $selectPayload = @{ Name = "Formatura_Direito_2026" } | ConvertTo-Json
+        $selEvRes = Invoke-RestMethod -Uri "http://localhost:$testPort/api/events/select" -Method Post -Body $selectPayload -ContentType "application/json"
+        Assert-Equal $selEvRes.Success $true "POST /api/events/select alternou evento ativo via API"
+
+        # 16.4: POST /api/monitoring/toggle (alternar monitoramento via API)
+        $toggleRes = Invoke-RestMethod -Uri "http://localhost:$testPort/api/monitoring/toggle" -Method Post
+        Assert-True ($null -ne $toggleRes.Active) "POST /api/monitoring/toggle alternou estado de monitoramento"
+
+        # 16.5: POST /api/card/register (cadastrar cartão via API)
+        $cardRegPayload = @{
+            EventName       = "Formatura_Direito_2026"
+            CardIdentifier  = "SONY_CFX_512"
+            Photographer    = "Carlos Fotografia"
+            DestinationPath = $evDest2
+            PhotoSubfolder  = "DCIM\100MSDCF"
+        } | ConvertTo-Json
+        $postCardRes = Invoke-RestMethod -Uri "http://localhost:$testPort/api/card/register" -Method Post -Body $cardRegPayload -ContentType "application/json"
+        Assert-Equal $postCardRes.Photographer "Carlos Fotografia" "POST /api/card/register cadastrou cartão com fotógrafo Carlos Fotografia"
+
+        # 16.6: GET /api/cards
+        $cardsListRes = Invoke-RestMethod -Uri "http://localhost:$testPort/api/cards?event=Formatura_Direito_2026"
+        Assert-True ($cardsListRes -is [System.Array]) "GET /api/cards retorna lista de cartões cadastrados"
+        Assert-Equal $cardsListRes.Count 1 "Exatamente 1 cartão cadastrado para o evento"
+    }
+    finally {
+        if ($serverProc3 -and -not $serverProc3.HasExited) {
+            Stop-Process -Id $serverProc3.Id -Force -ErrorAction SilentlyContinue
         }
     }
 

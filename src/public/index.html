@@ -36,49 +36,68 @@
             min-height: 100vh;
             line-height: 1.5;
             background-image: 
-                radial-gradient(circle at 15% 10%, rgba(6, 182, 212, 0.07) 0%, transparent 40%),
+                radial-gradient(circle at 15% 10%, rgba(6, 182, 212, 0.08) 0%, transparent 40%),
                 radial-gradient(circle at 85% 85%, rgba(59, 130, 246, 0.06) 0%, transparent 40%);
             background-attachment: fixed;
         }
-        .container { max-width: 1240px; margin: 0 auto; padding: 24px 20px 48px; }
+        .container { max-width: 1260px; margin: 0 auto; padding: 20px 20px 48px; }
+        
+        /* Top Navigation Header */
         header {
             display: flex; justify-content: space-between; align-items: center;
-            padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--border-subtle);
+            padding-bottom: 20px; margin-bottom: 16px; border-bottom: 1px solid var(--border-subtle);
+            flex-wrap: wrap; gap: 16px;
         }
-        .brand { display: flex; align-items: center; gap: 16px; }
+        .brand { display: flex; align-items: center; gap: 14px; }
         .brand-icon {
-            width: 48px; height: 48px; border-radius: var(--radius-md);
+            width: 44px; height: 44px; border-radius: var(--radius-md);
             background: linear-gradient(135deg, var(--brand-cyan), var(--brand-blue));
             display: flex; align-items: center; justify-content: center; box-shadow: var(--glow-cyan);
         }
-        .brand-icon svg { width: 26px; height: 26px; color: #ffffff; }
-        .brand-text h1 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; }
-        .brand-text p { font-size: 0.85rem; color: var(--text-secondary); }
-        .header-actions { display: flex; align-items: center; gap: 12px; }
-        .badge-status {
-            display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;
+        .brand-icon svg { width: 24px; height: 24px; color: #ffffff; }
+        .brand-text h1 { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.02em; }
+        .brand-text p { font-size: 0.8rem; color: var(--text-secondary); }
+        
+        .header-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        
+        /* Event Badge & Selector */
+        .event-badge {
+            display: inline-flex; align-items: center; gap: 10px; padding: 8px 16px;
             border-radius: 9999px; font-size: 0.85rem; font-weight: 700;
+            background: rgba(6, 182, 212, 0.12); color: var(--brand-cyan);
+            border: 1px solid rgba(6, 182, 212, 0.3); box-shadow: var(--glow-cyan);
+        }
+        
+        /* Monitoring Control Bar */
+        .monitor-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--bg-surface); border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md); padding: 12px 20px; margin-bottom: 20px;
+            flex-wrap: wrap; gap: 12px;
+        }
+        .monitor-status { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; font-weight: 700; }
+        .monitor-bar.active { border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.05); }
+        .monitor-bar.paused { border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.06); }
+        
+        .badge-status {
+            display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px;
+            border-radius: 9999px; font-size: 0.8rem; font-weight: 700;
             background: rgba(16, 185, 129, 0.12); color: var(--success-green);
-            border: 1px solid rgba(16, 185, 129, 0.3); box-shadow: var(--glow-green);
-            transition: all 0.3s ease;
+            border: 1px solid rgba(16, 185, 129, 0.3);
         }
         .badge-status.ingesting {
             background: rgba(6, 182, 212, 0.15); color: var(--brand-cyan);
             border-color: rgba(6, 182, 212, 0.4); box-shadow: var(--glow-cyan);
         }
-        .badge-status.ejected {
-            background: rgba(16, 185, 129, 0.25); color: #ffffff;
-            border-color: var(--success-green); box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
-            animation: pulseSuccess 2s infinite;
-        }
         .badge-status.aborted {
             background: rgba(245, 158, 11, 0.2); color: var(--warning-amber);
             border-color: rgba(245, 158, 11, 0.5); box-shadow: var(--glow-amber);
         }
-        @keyframes pulseSuccess {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.03); }
+        .badge-status.ejected {
+            background: rgba(16, 185, 129, 0.25); color: #ffffff;
+            border-color: var(--success-green); box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
         }
+        
         .pulse-dot {
             width: 8px; height: 8px; border-radius: 50%;
             background-color: currentColor; animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
@@ -87,9 +106,11 @@
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.4; transform: scale(1.3); }
         }
+        
+        /* Buttons */
         .btn {
-            display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px;
-            border-radius: var(--radius-md); font-size: 0.875rem; font-weight: 600;
+            display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px;
+            border-radius: var(--radius-md); font-size: 0.85rem; font-weight: 600;
             cursor: pointer; border: 1px solid transparent; transition: all 0.2s ease;
             text-decoration: none; background: var(--bg-elevated); color: var(--text-primary);
         }
@@ -108,86 +129,103 @@
             background: rgba(245, 158, 11, 0.28); color: #fef3c7;
             border-color: #f59e0b; box-shadow: var(--glow-amber);
         }
-        .btn-danger {
-            background: rgba(239, 68, 68, 0.15); color: #f87171;
-            border: 1px solid rgba(239, 68, 68, 0.3);
+        .btn-success {
+            background: rgba(16, 185, 129, 0.18); color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.4);
         }
-        .btn-danger:hover { background: rgba(239, 68, 68, 0.25); color: #fee2e2; }
-        .grid-layout { display: grid; grid-template-columns: 1fr 340px; gap: 24px; }
-        @media (max-width: 900px) { .grid-layout { grid-template-columns: 1fr; } }
+        .btn-success:hover { background: rgba(16, 185, 129, 0.3); color: #ffffff; }
+        
+        /* Grid Layout */
+        .grid-layout { display: grid; grid-template-columns: 1fr 360px; gap: 20px; }
+        @media (max-width: 960px) { .grid-layout { grid-template-columns: 1fr; } }
+        
         .card {
             background: var(--bg-surface); border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-lg); padding: 24px;
-            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5); margin-bottom: 24px;
+            border-radius: var(--radius-lg); padding: 22px;
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5); margin-bottom: 20px;
         }
-        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .card-title { font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
-        .card-title svg { width: 20px; height: 20px; color: var(--brand-cyan); }
-        .form-group { margin-bottom: 18px; }
-        .form-label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
-        .input-with-button { display: flex; gap: 8px; }
-        .form-input {
-            width: 100%; padding: 12px 14px; background: var(--bg-base);
-            border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-            color: var(--text-primary); font-family: inherit; font-size: 0.95rem; transition: border-color 0.2s;
-        }
-        .form-input:focus { outline: none; border-color: var(--brand-cyan); box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.2); }
-        .drives-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-top: 10px; margin-bottom: 16px; }
-        .drive-card { background: var(--bg-base); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; cursor: pointer; transition: all 0.2s ease; }
-        .drive-card:hover { border-color: var(--brand-cyan); transform: translateY(-2px); }
-        .drive-card.selected { border-color: var(--brand-cyan); background: rgba(6, 182, 212, 0.08); box-shadow: 0 0 16px rgba(6, 182, 212, 0.2); }
-        .drive-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .drive-letter { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.1rem; color: #ffffff; }
-        .drive-tag { font-size: 0.7rem; background: var(--bg-elevated); padding: 2px 8px; border-radius: 4px; color: var(--text-secondary); }
-        .drive-label { font-size: 0.8rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 8px; }
-        .drive-progress-bar { height: 6px; background: var(--bg-elevated); border-radius: 3px; overflow: hidden; margin-bottom: 6px; }
-        .drive-progress-fill { height: 100%; background: var(--brand-cyan); }
-        .drive-space { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .card-title { font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .card-title svg { width: 18px; height: 18px; color: var(--brand-cyan); }
+        
+        /* Ingest Progress Box */
         .ingest-box {
             background: linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(59, 130, 246, 0.08));
             border: 1px solid var(--border-accent); border-radius: var(--radius-lg);
-            padding: 24px; margin-bottom: 24px; display: none;
+            padding: 22px; margin-bottom: 20px; display: none;
         }
         .ingest-box.active { display: block; animation: fadeIn 0.3s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-        .ingest-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
-        .ingest-photographer { font-size: 1.25rem; font-weight: 800; color: #ffffff; }
-        .progress-track { height: 12px; background: var(--bg-base); border-radius: 6px; overflow: hidden; margin: 16px 0; border: 1px solid var(--border-subtle); }
+        
+        .progress-track { height: 12px; background: var(--bg-base); border-radius: 6px; overflow: hidden; margin: 14px 0; border: 1px solid var(--border-subtle); }
         .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--brand-cyan), var(--success-green)); width: 0%; transition: width 0.2s ease; }
         .progress-metrics { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; }
         .file-current { font-size: 0.8rem; color: var(--brand-cyan); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 8px; font-family: 'JetBrains Mono', monospace; }
+        
+        /* Notification Banner */
         .notification-banner {
-            border-radius: var(--radius-md); padding: 16px 20px;
+            border-radius: var(--radius-md); padding: 14px 18px;
             margin-bottom: 20px; display: none; align-items: center; gap: 14px;
-            font-size: 0.95rem; font-weight: 600;
+            font-size: 0.9rem; font-weight: 600;
         }
         .notification-banner.show { display: flex; animation: fadeIn 0.3s ease; }
         .banner-success { background: rgba(16, 185, 129, 0.15); border: 1px solid var(--success-green); color: #ffffff; }
         .banner-warning { background: rgba(245, 158, 11, 0.18); border: 1px solid var(--warning-amber); color: #fef3c7; }
+        
+        /* Form Inputs */
+        .form-group { margin-bottom: 16px; }
+        .form-label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
+        .input-with-button { display: flex; gap: 8px; }
+        .form-input, .form-select {
+            width: 100%; padding: 10px 12px; background: var(--bg-base);
+            border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+            color: var(--text-primary); font-family: inherit; font-size: 0.9rem; transition: border-color 0.2s;
+        }
+        .form-input:focus, .form-select:focus { outline: none; border-color: var(--brand-cyan); box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.2); }
+        
+        /* Tables */
         .table-responsive { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-        th { text-align: left; padding: 12px 14px; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border-subtle); font-size: 0.75rem; text-transform: uppercase; }
-        td { padding: 14px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); color: var(--text-primary); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th { text-align: left; padding: 10px 12px; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border-subtle); font-size: 0.72rem; text-transform: uppercase; }
+        td { padding: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); color: var(--text-primary); }
         tr:hover td { background: rgba(255, 255, 255, 0.02); }
         .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        /* Modals */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px);
+            display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
+        }
+        .modal-overlay.open { display: flex; animation: fadeIn 0.2s ease; }
+        .modal-card {
+            background: var(--bg-surface); border: 1px solid var(--border-accent);
+            border-radius: var(--radius-lg); width: 100%; max-width: 650px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8); overflow: hidden;
+        }
+        .modal-header {
+            padding: 18px 24px; background: var(--bg-elevated); border-bottom: 1px solid var(--border-subtle);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .modal-title { font-size: 1.1rem; font-weight: 800; color: #ffffff; }
+        .modal-body { padding: 24px; max-height: 70vh; overflow-y: auto; }
+        .modal-footer {
+            padding: 16px 24px; background: var(--bg-elevated); border-top: 1px solid var(--border-subtle);
+            display: flex; justify-content: flex-end; gap: 12px;
+        }
+        
         .toast {
-            position: fixed; bottom: 24px; right: 24px; padding: 14px 20px;
+            position: fixed; bottom: 24px; right: 24px; padding: 12px 18px;
             background: var(--bg-elevated); color: #ffffff; border-radius: var(--radius-md);
             border: 1px solid var(--border-accent); box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-            font-size: 0.875rem; transform: translateY(100px); opacity: 0;
-            transition: all 0.3s ease; z-index: 999;
+            font-size: 0.85rem; transform: translateY(100px); opacity: 0;
+            transition: all 0.3s ease; z-index: 9999;
         }
         .toast.show { transform: translateY(0); opacity: 1; }
-        .mappings-grid-form {
-            display: grid; grid-template-columns: 1fr 1.5fr 1fr auto; gap: 10px; align-items: flex-end; margin-bottom: 16px;
-        }
-        @media (max-width: 800px) {
-            .mappings-grid-form { grid-template-columns: 1fr; }
-        }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Barra de Cabeçalho Superior -->
         <header>
             <div class="brand">
                 <div class="brand-icon">
@@ -198,27 +236,38 @@
                 </div>
                 <div class="brand-text">
                     <h1>ESTAÇÃO DE INGESTÃO DIT</h1>
-                    <p>Backup Seguro de Alta Confiabilidade para Eventos Fotográficos</p>
+                    <p>Backup Seguro de Alta Confiabilidade para Eventos</p>
                 </div>
             </div>
+            
             <div class="header-actions">
-                <div id="stationBadge" class="badge-status">
-                    <span class="pulse-dot"></span>
-                    <span id="stationStatusText">SISTEMA ARMADO</span>
+                <div class="event-badge">
+                    <span>EVENTO:</span>
+                    <strong id="badgeCurrentEvent">Carregando...</strong>
                 </div>
+                <button class="btn" onclick="openEventModal()" title="Trocar ou Criar Novo Evento">
+                    Trocar / Novo Evento
+                </button>
                 <button class="btn" onclick="testBuzzer()" title="Testar Sinal Sonoro">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-                    </svg>
                     Bip
                 </button>
             </div>
         </header>
 
-        <!-- Banner de Notificação de Ejeção / Conclusão -->
+        <!-- Barra de Controle de Monitoramento (Ativo / Pausado) -->
+        <div id="monitorBar" class="monitor-bar active">
+            <div class="monitor-status">
+                <span class="pulse-dot"></span>
+                <span id="monitorStatusText">MONITORAMENTO ATIVO - Leitura Automática de Cartões Ligada</span>
+            </div>
+            <button id="btnToggleMonitoring" class="btn btn-cancel" onclick="toggleMonitoring()">
+                ❚❚ Pausar Leitura de Cartões
+            </button>
+        </div>
+
+        <!-- Banners de Notificação -->
         <div id="ejectBanner" class="notification-banner banner-success">
-            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--success-green); flex-shrink:0;">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--success-green); flex-shrink:0;">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                 <polyline points="22 4 12 14.01 9 11.01"></polyline>
             </svg>
@@ -228,9 +277,8 @@
             <button class="btn" style="padding:4px 10px; font-size:0.75rem;" onclick="document.getElementById('ejectBanner').classList.remove('show')">✕ Fechar</button>
         </div>
 
-        <!-- Banner de Notificação de Interrupção Segura -->
         <div id="abortBanner" class="notification-banner banner-warning">
-            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--warning-amber); flex-shrink:0;">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--warning-amber); flex-shrink:0;">
                 <circle cx="12" cy="12" r="10"></circle>
                 <line x1="12" y1="8" x2="12" y2="12"></line>
                 <line x1="12" y1="16" x2="12.01" y2="16"></line>
@@ -241,19 +289,16 @@
             <button class="btn" style="padding:4px 10px; font-size:0.75rem;" onclick="document.getElementById('abortBanner').classList.remove('show')">✕ Fechar</button>
         </div>
 
-        <!-- Painel Ativo de Ingestão -->
+        <!-- Painel de Ingestão Ativa com Botão Parar -->
         <div id="ingestBox" class="ingest-box">
-            <div class="ingest-header">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
                 <div>
                     <span style="font-size:0.75rem; text-transform:uppercase; color:var(--brand-cyan); font-weight:700;">Ingestão em Andamento</span>
-                    <div id="activePhotographer" class="ingest-photographer">Cartão Detectado</div>
+                    <div id="activePhotographer" style="font-size:1.2rem; font-weight:800; color:#fff;">Cartão Detectado</div>
                 </div>
-                <div style="display:flex; align-items:center; gap:12px;">
-                    <span id="activeStatusBadge" class="badge-status ingesting">COPIANDO & VALIDANDO SHA-256</span>
-                    <button id="btnCancelIngestActive" class="btn btn-cancel" onclick="cancelCurrentIngest()" title="Interromper imediatamente sem corromper arquivos">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect>
-                        </svg>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span id="activeStatusBadge" class="badge-status ingesting">COPIANDO & SHA-256</span>
+                    <button class="btn btn-cancel" onclick="cancelCurrentIngest()" title="Parar com total segurança sem corromper arquivos">
                         Parar com Segurança
                     </button>
                 </div>
@@ -268,60 +313,13 @@
                 <span id="progressPercent">0%</span>
                 <span id="progressBytes">0 MB</span>
             </div>
-            <div id="currentFileName" class="file-current">Iniciando pipeline de segurança...</div>
+            <div id="currentFileName" class="file-current">Iniciando pipeline...</div>
         </div>
 
+        <!-- Grade Principal -->
         <div class="grid-layout">
             <div class="main-column">
-                <!-- Configurações Principais da Estação -->
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                            </svg>
-                            Destino Padrão dos Arquivos
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Unidades Detectadas na Máquina (Clique para selecionar o drive padrão)</label>
-                        <div id="drivesGrid" class="drives-grid">
-                            <div style="color:var(--text-muted); font-size:0.85rem;">Identificando discos...</div>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="targetFolder">Caminho da Pasta de Destino Padrão</label>
-                        <div class="input-with-button">
-                            <input type="text" id="targetFolder" class="form-input mono" placeholder="Ex: D:\Backups_Eventos">
-                            <button class="btn" type="button" onclick="browseFolder('destination')" title="Abrir janela de seleção de pasta no Windows">
-                                Procurar...
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="eventName">Nome do Evento Atual</label>
-                        <input type="text" id="eventName" class="form-input" placeholder="Ex: Casamento_Ana_e_Pedro">
-                        <small style="color:var(--text-muted); font-size:0.75rem; margin-top:4px; display:block;">
-                            Estrutura criada: <code>[Destino]\[Evento]\[Identificador_Cartao]\...</code>
-                        </small>
-                    </div>
-
-                    <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-top:12px;">
-                        <input type="checkbox" id="autoEjectCheck" checked style="width:18px; height:18px; accent-color:var(--brand-cyan); cursor:pointer;">
-                        <label for="autoEjectCheck" style="font-size:0.85rem; font-weight:600; cursor:pointer;">
-                            Ejetar o cartão automaticamente ao concluir o backup (Permite retirar o cartão direto com segurança)
-                        </label>
-                    </div>
-
-                    <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:16px;">
-                        <button class="btn btn-primary" onclick="saveConfig()">Salvar Configurações</button>
-                    </div>
-                </div>
-
-                <!-- Mapeamento Multi-Cartão & Destinos Personalizados -->
+                <!-- Cartões Cadastrados no Evento Atual -->
                 <div class="card">
                     <div class="card-header">
                         <div class="card-title">
@@ -331,50 +329,28 @@
                                 <line x1="6" y1="6" x2="6.01" y2="6"/>
                                 <line x1="6" y1="18" x2="6.01" y2="18"/>
                             </svg>
-                            Mapeamento de Cartões & Destinos Personalizados
+                            Cartões Cadastrados no Evento Atual
                         </div>
+                        <button class="btn" style="padding:6px 12px; font-size:0.75rem;" onclick="openCardSetupModal()">+ Cadastrar Cartão</button>
                     </div>
-                    <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:16px;">
-                        Associe cartões específicos (por identificador, nome no <code>fotografo.txt</code> ou letra de drive) a caminhos dedicados (ex: fotógrafos diferentes salvando em pastas/SSDs diferentes).
+                    <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:14px;">
+                        Na primeira vez que cada cartão for inserido, o sistema solicita o fotógrafo, pasta de fotos e destino. Nas vezes seguintes, o descarregamento é 100% automático.
                     </p>
-
-                    <div class="mappings-grid-form">
-                        <div>
-                            <label class="form-label" for="mapIdentifier">Cartão / Fotógrafo / Drive</label>
-                            <input type="text" id="mapIdentifier" class="form-input mono" placeholder="Ex: SONY_A7_LUCAS ou E:">
-                        </div>
-                        <div>
-                            <label class="form-label" for="mapDestination">Pasta de Destino Específica</label>
-                            <div class="input-with-button">
-                                <input type="text" id="mapDestination" class="form-input mono" placeholder="Ex: D:\Eventos\Lucas">
-                                <button class="btn" type="button" onclick="browseFolder('mapping')" title="Procurar pasta de destino">...</button>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="form-label" for="mapDescription">Identificação / Fotógrafo</label>
-                            <input type="text" id="mapDescription" class="form-input" placeholder="Ex: Lucas Câmera 1">
-                        </div>
-                        <div>
-                            <button class="btn btn-primary" onclick="addMappingRule()" style="white-space:nowrap;">
-                                + Adicionar Regra
-                            </button>
-                        </div>
-                    </div>
 
                     <div class="table-responsive">
                         <table>
                             <thead>
                                 <tr>
                                     <th>Cartão / ID</th>
-                                    <th>Destino Personalizado</th>
-                                    <th>Descrição</th>
-                                    <th>Ação</th>
+                                    <th>Fotógrafo</th>
+                                    <th>Subpasta Origem</th>
+                                    <th>Destino das Fotos</th>
                                 </tr>
                             </thead>
-                            <tbody id="mappingsTableBody">
+                            <tbody id="registeredCardsTableBody">
                                 <tr>
                                     <td colspan="4" style="text-align:center; color:var(--text-muted); padding:20px;">
-                                        Nenhum mapeamento customizado. Todos os cartões usarão o destino padrão.
+                                        Nenhum cartão cadastrado ainda para este evento. Insira um cartão para cadastrar!
                                     </td>
                                 </tr>
                             </tbody>
@@ -390,7 +366,7 @@
                                 <circle cx="12" cy="12" r="10"/>
                                 <polyline points="12 6 12 12 16 14"/>
                             </svg>
-                            Histórico de Ingestões & Auditoria
+                            Histórico de Ingestões & Auditoria do Evento
                         </div>
                         <button class="btn" style="padding:6px 12px; font-size:0.75rem;" onclick="loadHistory()">Atualizar</button>
                     </div>
@@ -400,9 +376,9 @@
                             <thead>
                                 <tr>
                                     <th>Horário</th>
-                                    <th>Identificação / Fotógrafo</th>
-                                    <th>Fotos Novas</th>
-                                    <th>Ignoradas (Já salvas)</th>
+                                    <th>Fotógrafo / Cartão</th>
+                                    <th>Novas</th>
+                                    <th>Puladas (Idempotência)</th>
                                     <th>Volume</th>
                                     <th>Status / Ejeção</th>
                                 </tr>
@@ -410,7 +386,7 @@
                             <tbody id="historyTableBody">
                                 <tr>
                                     <td colspan="6" style="text-align:center; color:var(--text-muted); padding:24px;">
-                                        Nenhuma ingestão registrada ainda. Insira um cartão para descarregar automaticamente!
+                                        Nenhuma ingestão registrada ainda.
                                     </td>
                                 </tr>
                             </tbody>
@@ -419,22 +395,23 @@
                 </div>
             </div>
 
+            <!-- Coluna Lateral -->
             <div class="sidebar-column">
-                <!-- Disparo Manual & Controle de Parada -->
+                <!-- Disparo Manual -->
                 <div class="card">
                     <div class="card-header">
                         <div class="card-title">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polygon points="5 3 19 12 5 21 5 3"></polygon>
                             </svg>
-                            Controle Manual
+                            Disparo Manual
                         </div>
                     </div>
-                    <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:14px;">
-                        O sistema detecta e descarrega <b>automaticamente</b> ao plugar. Se o cartão já estiver conectado:
+                    <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:12px;">
+                        Se o cartão já estiver conectado antes de abrir a estação:
                     </p>
                     <div class="form-group">
-                        <label class="form-label" for="manualSource">Drive ou Pasta de Origem</label>
+                        <label class="form-label" for="manualSource">Unidade ou Pasta de Origem</label>
                         <div class="input-with-button">
                             <input type="text" id="manualSource" class="form-input mono" placeholder="Ex: E:\ ou E:\DCIM\100CANON">
                             <button class="btn" type="button" onclick="browseFolder('source')" title="Selecionar cartão no explorador">
@@ -442,20 +419,12 @@
                             </button>
                         </div>
                     </div>
-                    <div style="display:flex; flex-direction:column; gap:10px;">
-                        <button id="btnIngestNow" class="btn btn-primary" style="justify-content:center;" onclick="triggerManualIngest()">
-                            Ingerir Agora
-                        </button>
-                        <button id="btnCancelManual" class="btn btn-cancel" style="justify-content:center;" onclick="cancelCurrentIngest()" disabled>
-                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect>
-                            </svg>
-                            Parar com Segurança
-                        </button>
-                    </div>
+                    <button id="btnIngestNow" class="btn btn-primary" style="width:100%; justify-content:center;" onclick="triggerManualIngest()">
+                        Ingerir Agora
+                    </button>
                 </div>
 
-                <!-- Painel de Proteções Ativas -->
+                <!-- Proteções Ativas -->
                 <div class="card" style="border-left: 3px solid var(--brand-cyan);">
                     <div class="card-title" style="margin-bottom:12px; font-size:0.95rem;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--brand-cyan);">
@@ -464,14 +433,102 @@
                         Proteções DIT Ativas
                     </div>
                     <ul style="font-size:0.8rem; color:var(--text-secondary); list-style:none; display:flex; flex-direction:column; gap:8px;">
-                        <li>🛡️ <b>Imutabilidade do Cartão:</b> Acesso 100% somente leitura.</li>
-                        <li>🔒 <b>Validação SHA-256:</b> Conferência byte-a-byte contra corrupção.</li>
-                        <li>⚡ <b>Idempotência Instantânea:</b> Pula fotos já salvas em milissegundos.</li>
-                        <li>🛑 <b>Interrupção Segura:</b> Cancela sem arquivos corrompidos ou incompletos.</li>
-                        <li>🔀 <b>Multi-Cartão:</b> Roteamento de destinos customizados por fotógrafo.</li>
-                        <li>⏏️ <b>Ejeção Automática:</b> O cartão é ejetado sozinho com segurança.</li>
+                        <li>🛡️ <b>Somente Leitura:</b> O cartão nunca é alterado ou gravado.</li>
+                        <li>🔒 <b>Validação SHA-256:</b> Integridade garantida byte-a-byte.</li>
+                        <li>⚡ <b>Idempotência:</b> Pula arquivos já salvos em milissegundos.</li>
+                        <li>🛑 <b>Interrupção Segura:</b> Cancela sem arquivos incompletos.</li>
+                        <li>📸 <b>Multi-Fotógrafo:</b> Cada cartão tem sua pasta e subpasta.</li>
+                        <li>⏏️ <b>Ejeção Automática:</b> Cartão ejetado sozinho com segurança.</li>
                     </ul>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 1: SELEÇÃO / CRIAÇÃO DE EVENTO -->
+    <div id="eventModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title">Organização de Eventos DIT</div>
+                <button class="btn" style="padding:4px 10px;" onclick="closeEventModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+                    <div>
+                        <h3 style="font-size:0.9rem; margin-bottom:10px; color:var(--brand-cyan);">Eventos Anteriores</h3>
+                        <div id="eventsListContainer" style="max-height:220px; overflow-y:auto; border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:8px;">
+                            <div style="color:var(--text-muted); font-size:0.8rem;">Carregando eventos...</div>
+                        </div>
+                        <button class="btn btn-primary" style="margin-top:10px; width:100%; justify-content:center;" onclick="selectHighlightedEvent()">
+                            Abrir Evento Selecionado
+                        </button>
+                    </div>
+                    <div>
+                        <h3 style="font-size:0.9rem; margin-bottom:10px; color:var(--success-green);">Criar Novo Evento</h3>
+                        <div class="form-group">
+                            <label class="form-label" for="newEventNameInput">Nome do Evento</label>
+                            <input type="text" id="newEventNameInput" class="form-input" placeholder="Ex: Casamento_Ana_e_Pedro">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="newEventDestInput">Pasta Base de Armazenamento</label>
+                            <div class="input-with-button">
+                                <input type="text" id="newEventDestInput" class="form-input mono" placeholder="Ex: D:\Backups_Eventos">
+                                <button class="btn" onclick="browseFolder('newEventBase')">...</button>
+                            </div>
+                        </div>
+                        <button class="btn btn-success" style="width:100%; justify-content:center;" onclick="createNewEvent()">
+                            + Criar e Iniciar Evento
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeEventModal()">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: CADASTRO DO PRIMEIRO USO DO CARTÃO NO EVENTO -->
+    <div id="cardSetupModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title" style="color:var(--warning-amber);">Configurar Cartão para este Evento</div>
+                <button class="btn" style="padding:4px 10px;" onclick="closeCardSetupModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:16px;">
+                    Configure as regras deste cartão para o evento ativo (<b id="modalCardEventName" style="color:var(--brand-cyan);"></b>). Esta configuração é feita apenas na 1ª vez.
+                </p>
+
+                <div class="form-group">
+                    <label class="form-label" for="cardModalIdentifier">Identificador do Cartão / Volume</label>
+                    <input type="text" id="cardModalIdentifier" class="form-input mono" placeholder="Ex: SONY_TOUGH_128 ou Cartao_E">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="cardModalPhotographer">Nome do Fotógrafo</label>
+                    <input type="text" id="cardModalPhotographer" class="form-input" placeholder="Ex: Lucas Silva" oninput="updateCardModalSuggestedDest()">
+                    <small style="color:var(--text-muted); font-size:0.75rem; margin-top:4px; display:block;">
+                        Regra DIT: Um fotógrafo pode ter vários cartões, mas este cartão pertencerá apenas a este fotógrafo.
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="cardModalSubfolder">Caminho das Fotos no Cartão (Formatação da Câmera)</label>
+                    <input type="text" id="cardModalSubfolder" class="form-input mono" placeholder="Ex: DCIM\100EOSR5 ou DCIM ou \ (Raiz)">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="cardModalDestination">Pasta Onde Salvar as Fotos deste Cartão</label>
+                    <div class="input-with-button">
+                        <input type="text" id="cardModalDestination" class="form-input mono" placeholder="Ex: D:\Backups\Lucas_Silva">
+                        <button class="btn" onclick="browseFolder('cardModalDest')">Procurar...</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeCardSetupModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveCardRegistration()">Salvar e Iniciar Descarregamento</button>
             </div>
         </div>
     </div>
@@ -479,9 +536,8 @@
     <div id="toast" class="toast"><span id="toastMessage">Operação realizada com sucesso!</span></div>
 
     <script>
-        let currentConfig = {};
-        let lastReportedState = "";
-        let isIngesting = false;
+        let currentStatus = {};
+        let selectedEventInList = null;
 
         function showToast(msg) {
             const toast = document.getElementById('toast');
@@ -490,281 +546,50 @@
             setTimeout(() => { toast.classList.remove('show'); }, 3500);
         }
 
-        async function browseFolder(type) {
-            try {
-                showToast("Abrindo seletor de pastas no Windows...");
-                const res = await fetch('/api/browse-folder?type=' + type);
-                const data = await res.json();
-                if (data.SelectedPath) {
-                    if (type === 'destination') {
-                        document.getElementById('targetFolder').value = data.SelectedPath;
-                    } else if (type === 'mapping') {
-                        document.getElementById('mapDestination').value = data.SelectedPath;
-                    } else {
-                        document.getElementById('manualSource').value = data.SelectedPath;
-                    }
-                    showToast("Pasta selecionada: " + data.SelectedPath);
-                }
-            } catch (e) {
-                alert("Não foi possível abrir o seletor: " + e.message);
-            }
-        }
-
-        async function loadConfig() {
+        async function loadStatus() {
             try {
                 const res = await fetch('/api/status');
                 const data = await res.json();
-                currentConfig = data.Config || {};
+                currentStatus = data;
                 
-                document.getElementById('targetFolder').value = currentConfig.TargetRootPath || '';
-                document.getElementById('eventName').value = currentConfig.EventName || '';
-                document.getElementById('autoEjectCheck').checked = currentConfig.AutoEject !== false;
+                // Atualiza badge de evento
+                document.getElementById('badgeCurrentEvent').textContent = data.CurrentEvent || 'Não definido';
                 
-                renderDrives(data.Drives || []);
-                updateStationStatus(data);
-                loadMappings();
+                // Atualiza barra de monitoramento
+                const monBar = document.getElementById('monitorBar');
+                const monText = document.getElementById('monitorStatusText');
+                const monBtn = document.getElementById('btnToggleMonitoring');
+                
+                if (data.MonitoringActive) {
+                    monBar.className = "monitor-bar active";
+                    monText.textContent = "● MONITORAMENTO ATIVO - Leitura Automática de Cartões Ligada";
+                    monText.style.color = "var(--success-green)";
+                    monBtn.className = "btn btn-cancel";
+                    monBtn.textContent = "❚❚ Pausar Leitura de Cartões";
+                } else {
+                    monBar.className = "monitor-bar paused";
+                    monText.textContent = "❚❚ MONITORAMENTO PAUSADO - Nenhuma Leitura de Cartão Será Feita";
+                    monText.style.color = "var(--warning-amber)";
+                    monBtn.className = "btn btn-success";
+                    monBtn.textContent = "▶ Iniciar Leitura de Cartões";
+                }
+                
+                // Renderiza cartões cadastrados
+                renderRegisteredCards(data.RegisteredCards || []);
+                
+                // Atualiza progresso da ingestão
+                updateIngestProgress(data);
             } catch (e) {
                 console.error("Falha ao carregar status:", e);
             }
         }
 
-        function renderDrives(drives) {
-            const container = document.getElementById('drivesGrid');
-            if (!drives || drives.length === 0) {
-                container.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem;">Nenhum disco detectado.</div>';
-                return;
-            }
-
-            const currentPath = (document.getElementById('targetFolder').value || '').toUpperCase();
-
-            container.innerHTML = drives.map(d => {
-                const isSelected = currentPath.startsWith(d.RootDirectory.toUpperCase());
-                const fillPercent = Math.min(100, Math.max(0, 100 - d.PercentFree));
-                return `
-                    <div class="drive-card ${isSelected ? 'selected' : ''}" onclick="selectDrive('${d.RootDirectory}')">
-                        <div class="drive-header">
-                            <span class="drive-letter">${d.DriveLetter}</span>
-                            <span class="drive-tag">${d.DriveType}</span>
-                        </div>
-                        <div class="drive-label" title="${d.Label}">${d.Label}</div>
-                        <div class="drive-progress-bar">
-                            <div class="drive-progress-fill" style="width: ${fillPercent}%"></div>
-                        </div>
-                        <div class="drive-space">
-                            <span>Livre: <b>${d.FreeGB} GB</b></span>
-                            <span>${d.TotalGB} GB</span>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function selectDrive(rootPath) {
-            const clean = rootPath.replace(/\\$/, '');
-            document.getElementById('targetFolder').value = clean + '\\Backups_Eventos';
-            loadConfig();
-        }
-
-        async function saveConfig() {
-            const target = document.getElementById('targetFolder').value.trim();
-            const eventName = document.getElementById('eventName').value.trim();
-            const autoEject = document.getElementById('autoEjectCheck').checked;
-
-            if (!target || !eventName) {
-                alert("Por favor informe o caminho de destino e o nome do evento.");
-                return;
-            }
-
-            try {
-                const res = await fetch('/api/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        TargetRootPath: target,
-                        EventName: eventName,
-                        AutoEject: autoEject
-                    })
-                });
-                const result = await res.json();
-                showToast("Configurações salvas com sucesso!");
-                loadConfig();
-            } catch (e) {
-                alert("Erro ao salvar: " + e.message);
-            }
-        }
-
-        async function loadMappings() {
-            try {
-                const res = await fetch('/api/mappings');
-                const mappings = await res.json();
-                const tbody = document.getElementById('mappingsTableBody');
-                
-                if (!mappings || mappings.length === 0) {
-                    tbody.innerHTML = `
-                        <tr>
-                            <td colspan="4" style="text-align:center; color:var(--text-muted); padding:20px;">
-                                Nenhum mapeamento customizado. Todos os cartões usarão o destino padrão.
-                            </td>
-                        </tr>
-                    `;
-                    return;
-                }
-
-                tbody.innerHTML = mappings.map(m => {
-                    const desc = m.Description || '-';
-                    return `
-                        <tr>
-                            <td><b class="mono" style="color:var(--brand-cyan);">${m.Identifier}</b></td>
-                            <td class="mono" style="font-size:0.8rem; word-break:break-all;">${m.Destination}</td>
-                            <td>${desc}</td>
-                            <td>
-                                <button class="btn btn-danger" style="padding:4px 10px; font-size:0.75rem;" onclick="removeMappingRule('${encodeURIComponent(m.Identifier)}')">
-                                    Remover
-                                </button>
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
-            } catch (e) {
-                console.error("Falha ao carregar mapeamentos:", e);
-            }
-        }
-
-        async function addMappingRule() {
-            const ident = document.getElementById('mapIdentifier').value.trim();
-            const dest = document.getElementById('mapDestination').value.trim();
-            const desc = document.getElementById('mapDescription').value.trim();
-
-            if (!ident || !dest) {
-                alert("Informe o identificador do cartão/drive e a pasta de destino.");
-                return;
-            }
-
-            try {
-                const res = await fetch('/api/mappings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        Identifier: ident,
-                        Destination: dest,
-                        Description: desc
-                    })
-                });
-
-                if (res.ok) {
-                    showToast("Mapeamento salvo com sucesso!");
-                    document.getElementById('mapIdentifier').value = '';
-                    document.getElementById('mapDestination').value = '';
-                    document.getElementById('mapDescription').value = '';
-                    loadMappings();
-                } else {
-                    const err = await res.json();
-                    alert("Erro ao salvar mapeamento: " + (err.Error || "Falha na requisição"));
-                }
-            } catch (e) {
-                alert("Erro de comunicação: " + e.message);
-            }
-        }
-
-        async function removeMappingRule(encodedIdent) {
-            const ident = decodeURIComponent(encodedIdent);
-            if (!confirm(`Remover regra de destino para "${ident}"?`)) { return; }
-
-            try {
-                const res = await fetch('/api/mappings?identifier=' + encodeURIComponent(ident), {
-                    method: 'DELETE'
-                });
-                if (res.ok) {
-                    showToast("Mapeamento removido!");
-                    loadMappings();
-                } else {
-                    alert("Falha ao remover mapeamento.");
-                }
-            } catch (e) {
-                alert("Erro: " + e.message);
-            }
-        }
-
-        async function cancelCurrentIngest() {
-            if (!confirm("Deseja realmente interromper a ingestão?\n\nO processo será encerrado com total segurança: a foto atual será limpa e nenhum arquivo será corrompido.")) {
-                return;
-            }
-
-            try {
-                showToast("Solicitando cancelamento seguro...");
-                const btnActive = document.getElementById('btnCancelIngestActive');
-                const btnManual = document.getElementById('btnCancelManual');
-                if (btnActive) btnActive.disabled = true;
-                if (btnManual) btnManual.disabled = true;
-
-                const res = await fetch('/api/cancel', { method: 'POST' });
-                const data = await res.json();
-                if (data.Cancelled) {
-                    showToast("Cancelamento aceito! Finalizando com segurança...");
-                } else {
-                    alert("Aviso: " + data.Message);
-                }
-            } catch (e) {
-                alert("Erro ao enviar cancelamento: " + e.message);
-            }
-        }
-
-        async function testBuzzer() {
-            try {
-                await fetch('/api/beep', { method: 'POST' });
-                showToast("Sinal sonoro testado!");
-            } catch (e) {}
-        }
-
-        async function triggerManualIngest() {
-            const source = document.getElementById('manualSource').value.trim();
-            if (!source) {
-                alert("Informe a letra ou pasta do cartão (Ex: E:\\ ou E:\\DCIM\\100CANON)");
-                return;
-            }
-
-            const btn = document.getElementById('btnIngestNow');
-            btn.disabled = true;
-            btn.textContent = "Iniciando...";
-
-            try {
-                const res = await fetch('/api/manual-ingest', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ SourceDrive: source })
-                });
-                
-                const data = await res.json();
-                if (data.Error) {
-                    alert("Aviso: " + data.Error);
-                } else {
-                    showToast("Ingestão colocada na fila e iniciada!");
-                }
-            } catch (e) {
-                alert("Falha na comunicação com o servidor: " + e.message);
-            } finally {
-                btn.disabled = false;
-                btn.textContent = "Ingerir Agora";
-            }
-        }
-
-        function updateStationStatus(data) {
-            const badge = document.getElementById('stationBadge');
-            const badgeText = document.getElementById('stationStatusText');
+        function updateIngestProgress(data) {
             const ingestBox = document.getElementById('ingestBox');
             const ejectBanner = document.getElementById('ejectBanner');
             const abortBanner = document.getElementById('abortBanner');
-            const btnCancelManual = document.getElementById('btnCancelManual');
-            const btnCancelActive = document.getElementById('btnCancelIngestActive');
-
-            isIngesting = (data.State === "INGESTING" || data.IsIngesting === true);
-            if (btnCancelManual) btnCancelManual.disabled = !isIngesting;
-            if (btnCancelActive) btnCancelActive.disabled = !isIngesting;
 
             if (data.State === "INGESTING") {
-                badge.className = "badge-status ingesting";
-                badgeText.textContent = "INGESTÃO EM ANDAMENTO";
-                
                 ingestBox.classList.add('active');
                 document.getElementById('activePhotographer').textContent = data.ActiveCard || 'Cartão em Processamento';
                 
@@ -779,36 +604,73 @@
                 document.getElementById('currentFileName').textContent = data.CurrentFile || 'Verificando integridade SHA-256...';
             } 
             else if (data.State === "COMPLETED_EJECTED") {
-                badge.className = "badge-status ejected";
-                badgeText.textContent = "✓ CONCLUÍDO & EJETADO";
                 ingestBox.classList.remove('active');
-                
-                if (lastReportedState !== "COMPLETED_EJECTED") {
-                    ejectBanner.classList.add('show');
-                    abortBanner.classList.remove('show');
-                    document.getElementById('ejectBannerText').textContent = data.StatusMessage || "Backup concluído e cartão ejetado com segurança! Pode retirar o cartão.";
-                    loadHistory();
-                }
+                ejectBanner.classList.add('show');
+                abortBanner.classList.remove('show');
+                loadHistory();
             }
             else if (data.State === "ABORTED") {
-                badge.className = "badge-status aborted";
-                badgeText.textContent = "⚠ INTERROMPIDO COM SEGURANÇA";
                 ingestBox.classList.remove('active');
-
-                if (lastReportedState !== "ABORTED") {
-                    abortBanner.classList.add('show');
-                    ejectBanner.classList.remove('show');
-                    document.getElementById('abortBannerText').textContent = data.StatusMessage || "Ingestão interrompida com segurança pelo usuário. Nenhum arquivo foi corrompido.";
-                    loadHistory();
-                }
+                abortBanner.classList.add('show');
+                ejectBanner.classList.remove('show');
+                loadHistory();
             }
             else {
-                badge.className = "badge-status";
-                badgeText.textContent = "SISTEMA ARMADO";
                 ingestBox.classList.remove('active');
             }
+        }
 
-            lastReportedState = data.State;
+        function renderRegisteredCards(cards) {
+            const tbody = document.getElementById('registeredCardsTableBody');
+            if (!cards || cards.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" style="text-align:center; color:var(--text-muted); padding:20px;">
+                            Nenhum cartão cadastrado ainda para este evento. Insira um cartão para cadastrar!
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = cards.map(c => `
+                <tr>
+                    <td><b class="mono" style="color:var(--brand-cyan);">${c.CardIdentifier}</b></td>
+                    <td><b>${c.Photographer}</b></td>
+                    <td class="mono" style="font-size:0.8rem;">${c.PhotoSubfolder || '\\ (Raiz)'}</td>
+                    <td class="mono" style="font-size:0.8rem; word-break:break-all;">${c.DestinationPath}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function toggleMonitoring() {
+            try {
+                const res = await fetch('/api/monitoring/toggle', { method: 'POST' });
+                const data = await res.json();
+                showToast(data.Message || "Estado de monitoramento alterado");
+                loadStatus();
+            } catch (e) {
+                alert("Erro ao alterar monitoramento: " + e.message);
+            }
+        }
+
+        async function cancelCurrentIngest() {
+            if (!confirm("Deseja realmente interromper a ingestão?\n\nO processo será encerrado com total segurança: a foto atual será limpa e nenhum arquivo será corrompido.")) {
+                return;
+            }
+
+            try {
+                showToast("Solicitando cancelamento seguro...");
+                const res = await fetch('/api/cancel', { method: 'POST' });
+                const data = await res.json();
+                if (data.Cancelled) {
+                    showToast("Cancelamento aceito! Finalizando com segurança...");
+                } else {
+                    alert("Aviso: " + data.Message);
+                }
+            } catch (e) {
+                alert("Erro ao enviar cancelamento: " + e.message);
+            }
         }
 
         async function loadHistory() {
@@ -857,15 +719,212 @@
             }
         }
 
-        loadConfig();
-        loadHistory();
-        setInterval(async () => {
+        async function triggerManualIngest() {
+            const source = document.getElementById('manualSource').value.trim();
+            if (!source) {
+                alert("Informe a letra ou pasta do cartão (Ex: E:\\ ou E:\\DCIM\\100CANON)");
+                return;
+            }
+
+            const btn = document.getElementById('btnIngestNow');
+            btn.disabled = true;
+            btn.textContent = "Iniciando...";
+
             try {
-                const res = await fetch('/api/status');
+                const res = await fetch('/api/manual-ingest', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ SourceDrive: source })
+                });
+                
                 const data = await res.json();
-                updateStationStatus(data);
+                if (data.Error) {
+                    alert("Aviso: " + data.Error);
+                } else {
+                    showToast("Ingestão colocada na fila e iniciada!");
+                }
+            } catch (e) {
+                alert("Falha na comunicação: " + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Ingerir Agora";
+            }
+        }
+
+        async function browseFolder(type) {
+            try {
+                showToast("Abrindo seletor de pastas no Windows...");
+                const res = await fetch('/api/browse-folder?type=' + type);
+                const data = await res.json();
+                if (data.SelectedPath) {
+                    if (type === 'source') {
+                        document.getElementById('manualSource').value = data.SelectedPath;
+                    } else if (type === 'newEventBase') {
+                        document.getElementById('newEventDestInput').value = data.SelectedPath;
+                    } else if (type === 'cardModalDest') {
+                        document.getElementById('cardModalDestination').value = data.SelectedPath;
+                    }
+                    showToast("Pasta selecionada: " + data.SelectedPath);
+                }
+            } catch (e) {
+                alert("Não foi possível abrir o seletor: " + e.message);
+            }
+        }
+
+        /* Modals */
+        function openEventModal() {
+            document.getElementById('eventModal').classList.add('open');
+            renderEventsModalList();
+        }
+
+        function closeEventModal() {
+            document.getElementById('eventModal').classList.remove('open');
+        }
+
+        function renderEventsModalList() {
+            const container = document.getElementById('eventsListContainer');
+            const events = currentStatus.Events || [];
+            
+            if (events.length === 0) {
+                container.innerHTML = '<div style="color:var(--text-muted); font-size:0.8rem; padding:8px;">Nenhum evento registrado.</div>';
+                return;
+            }
+
+            container.innerHTML = events.map(ev => {
+                const isCur = ev.Name === currentStatus.CurrentEvent;
+                return `
+                    <div style="padding:8px 12px; margin-bottom:4px; border-radius:6px; cursor:pointer; background:${isCur ? 'rgba(6,182,212,0.15)' : 'var(--bg-elevated)'}; border:1px solid ${isCur ? 'var(--brand-cyan)' : 'transparent'};" onclick="highlightEvent('${ev.Name}', this)">
+                        <div style="font-weight:700; color:${isCur ? 'var(--brand-cyan)' : 'var(--text-primary)'};">${ev.Name} ${isCur ? '(Ativo)' : ''}</div>
+                        <div style="font-size:0.75rem; color:var(--text-secondary);">${ev.CardCount} cartões cadastrados</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function highlightEvent(name, el) {
+            selectedEventInList = name;
+            const items = document.getElementById('eventsListContainer').children;
+            for (let item of items) { item.style.borderColor = 'transparent'; }
+            el.style.borderColor = 'var(--brand-cyan)';
+        }
+
+        async function selectHighlightedEvent() {
+            if (!selectedEventInList) {
+                alert("Selecione um evento da lista.");
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/events/select', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ Name: selectedEventInList })
+                });
+                if (res.ok) {
+                    showToast("Evento alterado para: " + selectedEventInList);
+                    closeEventModal();
+                    loadStatus();
+                }
+            } catch (e) {
+                alert("Erro ao selecionar evento: " + e.message);
+            }
+        }
+
+        async function createNewEvent() {
+            const name = document.getElementById('newEventNameInput').value.trim();
+            const dest = document.getElementById('newEventDestInput').value.trim();
+            if (!name) {
+                alert("Por favor informe o nome do novo evento.");
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/events', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ Name: name, Destination: dest })
+                });
+                if (res.ok) {
+                    showToast("Novo evento criado e ativado: " + name);
+                    closeEventModal();
+                    loadStatus();
+                } else {
+                    const err = await res.json();
+                    alert("Erro ao criar evento: " + err.Error);
+                }
+            } catch (e) {
+                alert("Erro: " + e.message);
+            }
+        }
+
+        function openCardSetupModal() {
+            document.getElementById('cardSetupModal').classList.add('open');
+            document.getElementById('modalCardEventName').textContent = currentStatus.CurrentEvent;
+            document.getElementById('cardModalIdentifier').value = '';
+            document.getElementById('cardModalPhotographer').value = '';
+            document.getElementById('cardModalSubfolder').value = 'DCIM';
+            updateCardModalSuggestedDest();
+        }
+
+        function closeCardSetupModal() {
+            document.getElementById('cardSetupModal').classList.remove('open');
+        }
+
+        function updateCardModalSuggestedDest() {
+            const p = document.getElementById('cardModalPhotographer').value.trim();
+            const base = (currentStatus.Config && currentStatus.Config.TargetRootPath) ? currentStatus.Config.TargetRootPath : "D:\\Backups_Eventos";
+            const ev = currentStatus.CurrentEvent || "Evento_Atual";
+            const cleanP = p.replace(/[\\/:*?"<>|]/g, '_');
+            document.getElementById('cardModalDestination').value = base + "\\" + ev + "\\" + (cleanP || "Fotografo_1");
+        }
+
+        async function saveCardRegistration() {
+            const ident = document.getElementById('cardModalIdentifier').value.trim();
+            const photog = document.getElementById('cardModalPhotographer').value.trim();
+            const subf = document.getElementById('cardModalSubfolder').value.trim();
+            const dest = document.getElementById('cardModalDestination').value.trim();
+
+            if (!ident || !photog || !dest) {
+                alert("Identificador, Fotógrafo e Destino são obrigatórios.");
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/card/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        EventName: currentStatus.CurrentEvent,
+                        CardIdentifier: ident,
+                        Photographer: photog,
+                        PhotoSubfolder: subf,
+                        DestinationPath: dest
+                    })
+                });
+
+                if (res.ok) {
+                    showToast("Cartão cadastrado com sucesso!");
+                    closeCardSetupModal();
+                    loadStatus();
+                } else {
+                    const err = await res.json();
+                    alert("Erro ao cadastrar cartão: " + err.Error);
+                }
+            } catch (e) {
+                alert("Erro de comunicação: " + e.message);
+            }
+        }
+
+        async function testBuzzer() {
+            try {
+                await fetch('/api/beep', { method: 'POST' });
+                showToast("Sinal sonoro testado!");
             } catch (e) {}
-        }, 1500);
+        }
+
+        loadStatus();
+        loadHistory();
+        setInterval(loadStatus, 1500);
     </script>
 </body>
 </html>

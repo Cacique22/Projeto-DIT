@@ -57,6 +57,14 @@ function Watch-Loop {
                 if (-not $knownDrives.Contains($driveName)) {
                     Write-Host "`n[+] NOVO DISPOSITIVO DETECTADO: $driveName ($($d.VolumeLabel))" -ForegroundColor Cyan
                     
+                    # Checa se o monitoramento está pausado pelo usuário
+                    $isMonitoring = Get-MonitoringState
+                    if (-not $isMonitoring) {
+                        Write-Host "[⏸] MONITORAMENTO PAUSADO: Dispositivo $driveName detectado mas ignorado conforme solicitado." -ForegroundColor Yellow
+                        [void]$knownDrives.Add($driveName)
+                        continue
+                    }
+                    
                     # Aguarda 1.5s para estabilização de montagem do Windows
                     Start-Sleep -Milliseconds 1500
                     
