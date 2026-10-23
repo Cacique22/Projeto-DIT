@@ -53,13 +53,12 @@ namespace AutoIngestStation
 
                 ProcessStartInfo psi = new ProcessStartInfo();
                 psi.FileName = "powershell.exe";
-                psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"" + foundScript + "\"";
-                psi.UseShellExecute = false;
-                psi.CreateNoWindow = true;
+                psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File \"" + foundScript + "\"";
+                psi.UseShellExecute = true;
+                psi.WindowStyle = ProcessWindowStyle.Hidden;
                 psi.WorkingDirectory = Path.GetDirectoryName(foundScript);
 
-                Process proc = Process.Start(psi);
-                proc.WaitForExit();
+                Process.Start(psi);
             }
             catch (Exception ex)
             {

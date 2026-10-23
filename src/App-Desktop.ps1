@@ -1,4 +1,4 @@
-# App-Desktop.ps1 - Aplicativo Desktop Nativo da Estação de Ingestão DIT
+# App-Desktop.ps1 - Aplicativo Desktop Nativo da Estacao de Ingestao DIT
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
@@ -21,7 +21,7 @@ $colorGreen = [System.Drawing.Color]::FromArgb(16, 185, 129)
 $colorRed = [System.Drawing.Color]::FromArgb(239, 68, 68)
 
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "Estação de Ingestão DIT - Backup Seguro"
+$form.Text = "Estacao de Ingestao DIT - Backup Seguro"
 $form.Size = New-Object System.Drawing.Size(940, 720)
 $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
 $form.BackColor = $colorBg
@@ -36,7 +36,7 @@ $headerPanel.BackColor = $colorSurface
 $form.Controls.Add($headerPanel)
 
 $lblTitle = New-Object System.Windows.Forms.Label
-$lblTitle.Text = "ESTAÇÃO DE INGESTÃO DIT"
+$lblTitle.Text = "ESTACAO DE INGESTAO DIT"
 $lblTitle.Font = New-Object System.Drawing.Font("Segoe UI", 13, [System.Drawing.FontStyle]::Bold)
 $lblTitle.ForeColor = $colorText
 $lblTitle.Location = New-Object System.Drawing.Point(20, 12)
@@ -44,7 +44,7 @@ $lblTitle.AutoSize = $true
 $headerPanel.Controls.Add($lblTitle)
 
 $lblSubTitle = New-Object System.Windows.Forms.Label
-$lblSubTitle.Text = "Backup Seguro de Alta Confiabilidade para Eventos Fotográficos"
+$lblSubTitle.Text = "Backup Seguro de Alta Confiabilidade para Eventos Fotograficos"
 $lblSubTitle.Font = New-Object System.Drawing.Font("Segoe UI", 8.5)
 $lblSubTitle.ForeColor = $colorTextMuted
 $lblSubTitle.Location = New-Object System.Drawing.Point(22, 38)
@@ -52,7 +52,7 @@ $lblSubTitle.AutoSize = $true
 $headerPanel.Controls.Add($lblSubTitle)
 
 $lblBadge = New-Object System.Windows.Forms.Label
-$lblBadge.Text = "● SISTEMA ARMADO"
+$lblBadge.Text = "[*] SISTEMA ARMADO"
 $lblBadge.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
 $lblBadge.ForeColor = $colorGreen
 $lblBadge.BackColor = [System.Drawing.Color]::FromArgb(20, 16, 185, 129)
@@ -67,9 +67,9 @@ $mainPanel.Dock = [System.Windows.Forms.DockStyle]::Fill
 $mainPanel.Padding = New-Object System.Windows.Forms.Padding(20)
 $form.Controls.Add($mainPanel)
 
-# Grupo 1: Configurações
+# Grupo 1: Configuracoes
 $grpConfig = New-Object System.Windows.Forms.GroupBox
-$grpConfig.Text = " Configurações de Armazenamento "
+$grpConfig.Text = " Configuracoes de Armazenamento "
 $grpConfig.ForeColor = $colorCyan
 $grpConfig.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $grpConfig.Location = New-Object System.Drawing.Point(20, 85)
@@ -93,7 +93,7 @@ $txtDest.Size = New-Object System.Drawing.Size(700, 26)
 $grpConfig.Controls.Add($txtDest)
 
 $btnBrowseDest = New-Object System.Windows.Forms.Button
-$btnBrowseDest.Text = "📂 Procurar..."
+$btnBrowseDest.Text = "Procurar Pasta..."
 $btnBrowseDest.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
 $btnBrowseDest.BackColor = $colorElevated
 $btnBrowseDest.ForeColor = $colorText
@@ -119,7 +119,7 @@ $txtEvent.Size = New-Object System.Drawing.Size(320, 26)
 $grpConfig.Controls.Add($txtEvent)
 
 $chkAutoEject = New-Object System.Windows.Forms.CheckBox
-$chkAutoEject.Text = "Ejetar o cartão automaticamente após concluir o backup com segurança"
+$chkAutoEject.Text = "Ejetar o cartao automaticamente apos concluir o backup com seguranca"
 $chkAutoEject.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $chkAutoEject.ForeColor = $colorText
 $chkAutoEject.Checked = $true
@@ -137,9 +137,9 @@ $btnSave.Location = New-Object System.Drawing.Point(765, 108)
 $btnSave.Size = New-Object System.Drawing.Size(100, 30)
 $grpConfig.Controls.Add($btnSave)
 
-# Grupo 2: Monitor de Ingestão e Disparo
+# Grupo 2: Monitor de Ingestao e Disparo
 $grpMonitor = New-Object System.Windows.Forms.GroupBox
-$grpMonitor.Text = " Monitor de Ingestão & Disparo Manual "
+$grpMonitor.Text = " Monitor de Ingestao & Disparo Manual "
 $grpMonitor.ForeColor = $colorCyan
 $grpMonitor.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $grpMonitor.Location = New-Object System.Drawing.Point(20, 250)
@@ -147,7 +147,7 @@ $grpMonitor.Size = New-Object System.Drawing.Size(880, 175)
 $mainPanel.Controls.Add($grpMonitor)
 
 $lblManual = New-Object System.Windows.Forms.Label
-$lblManual.Text = "Cartão ou Pasta de Fotos (Detecção é automática, mas você pode selecionar manualmente):"
+$lblManual.Text = "Cartao ou Pasta de Fotos (Deteccao automatica ao plugar, ou selecione manualmente):"
 $lblManual.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblManual.ForeColor = $colorText
 $lblManual.Location = New-Object System.Drawing.Point(15, 25)
@@ -163,7 +163,7 @@ $txtSource.Size = New-Object System.Drawing.Size(560, 26)
 $grpMonitor.Controls.Add($txtSource)
 
 $btnBrowseSrc = New-Object System.Windows.Forms.Button
-$btnBrowseSrc.Text = "📂 Selecionar Cartão..."
+$btnBrowseSrc.Text = "Selecionar Cartao..."
 $btnBrowseSrc.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
 $btnBrowseSrc.BackColor = $colorElevated
 $btnBrowseSrc.ForeColor = $colorText
@@ -173,7 +173,7 @@ $btnBrowseSrc.Size = New-Object System.Drawing.Size(150, 30)
 $grpMonitor.Controls.Add($btnBrowseSrc)
 
 $btnStart = New-Object System.Windows.Forms.Button
-$btnStart.Text = "▶ Ingerir Agora"
+$btnStart.Text = "Ingerir Agora"
 $btnStart.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
 $btnStart.BackColor = $colorGreen
 $btnStart.ForeColor = [System.Drawing.Color]::Black
@@ -192,7 +192,7 @@ $progressBar.Value = 0
 $grpMonitor.Controls.Add($progressBar)
 
 $lblStatusDetail = New-Object System.Windows.Forms.Label
-$lblStatusDetail.Text = "Aguardando conexão de cartões SD / Leitores USB..."
+$lblStatusDetail.Text = "Aguardando conexao de cartoes SD / Leitores USB..."
 $lblStatusDetail.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $lblStatusDetail.ForeColor = $colorTextMuted
 $lblStatusDetail.Location = New-Object System.Drawing.Point(15, 122)
@@ -207,9 +207,9 @@ $lblFileDetail.Location = New-Object System.Drawing.Point(15, 144)
 $lblFileDetail.Size = New-Object System.Drawing.Size(850, 20)
 $grpMonitor.Controls.Add($lblFileDetail)
 
-# Grupo 3: Histórico de Auditoria
+# Grupo 3: Historico de Auditoria
 $grpHistory = New-Object System.Windows.Forms.GroupBox
-$grpHistory.Text = " Histórico de Auditoria da Sessão "
+$grpHistory.Text = " Historico de Auditoria da Sessao "
 $grpHistory.ForeColor = $colorCyan
 $grpHistory.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $grpHistory.Location = New-Object System.Drawing.Point(20, 435)
@@ -226,15 +226,14 @@ $gridHistory.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $gridHistory.Location = New-Object System.Drawing.Point(15, 25)
 $gridHistory.Size = New-Object System.Drawing.Size(850, 180)
 
-[void]$gridHistory.Columns.Add("Horário", 100)
-[void]$gridHistory.Columns.Add("Fotógrafo / Cartão", 240)
+[void]$gridHistory.Columns.Add("Horario", 100)
+[void]$gridHistory.Columns.Add("Fotografo / Cartao", 240)
 [void]$gridHistory.Columns.Add("Fotos Novas", 120)
 [void]$gridHistory.Columns.Add("Ignoradas (Salvas)", 140)
 [void]$gridHistory.Columns.Add("Volume", 110)
-[void]$gridHistory.Columns.Add("Ejeção", 120)
+[void]$gridHistory.Columns.Add("Ejecao", 120)
 $grpHistory.Controls.Add($gridHistory)
 
-# Carrega Configurações
 function Load-FormConfig {
     $cfg = Get-StationConfig
     $txtDest.Text = $cfg.TargetRootPath
@@ -254,7 +253,7 @@ $btnBrowseDest.Add_Click({
 
 $btnBrowseSrc.Add_Click({
     $fbd = New-Object System.Windows.Forms.FolderBrowserDialog
-    $fbd.Description = "Selecione o Cartão SD ou Pasta de Fotos de Origem"
+    $fbd.Description = "Selecione o Cartao SD ou Pasta de Fotos de Origem"
     $fbd.ShowNewFolderButton = $false
     if ($fbd.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
         $txtSource.Text = $fbd.SelectedPath
@@ -268,28 +267,25 @@ $btnSave.Add_Click({
         AutoEject = $chkAutoEject.Checked
     }
     Set-StationConfig -Config $ht | Out-Null
-    [System.Windows.Forms.MessageBox]::Show($form, "Configurações salvas com sucesso!", "Sucesso", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+    [System.Windows.Forms.MessageBox]::Show($form, "Configuracoes salvas com sucesso!", "Sucesso", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
 })
 
-# Executa Ingestão
 function Run-AppIngest {
     param([string]$SourcePath)
     
     if ([string]::IsNullOrWhiteSpace($SourcePath) -or -not (Test-Path $SourcePath)) {
-        [System.Windows.Forms.MessageBox]::Show($form, "Caminho de origem não encontrado: $SourcePath", "Aviso", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+        [System.Windows.Forms.MessageBox]::Show($form, "Caminho de origem nao encontrado: $SourcePath", "Aviso", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
         return
     }
     
-    $lblBadge.Text = "● INGESTÃO EM ANDAMENTO"
+    $lblBadge.Text = "[*] INGESTAO EM ANDAMENTO"
     $lblBadge.ForeColor = $colorCyan
     $lblBadge.BackColor = [System.Drawing.Color]::FromArgb(30, 6, 182, 212)
     $btnStart.Enabled = $false
     $progressBar.Value = 0
-    $lblStatusDetail.Text = "Iniciando verificação de integridade..."
+    $lblStatusDetail.Text = "Iniciando verificacao de integridade..."
     $lblFileDetail.Text = ""
     $form.Update()
-    
-    $cfg = Get-StationConfig
     
     try {
         $res = Invoke-CardIngest -SourceDrive $SourcePath `
@@ -302,42 +298,41 @@ function Run-AppIngest {
                 $progressBar.Value = [math]::Min(100, [math]::Max(0, $pct))
                 $mbCopied = [math]::Round($p.BytesCopied / 1MB, 1)
                 $mbTotal = [math]::Round($p.TotalBytes / 1MB, 1)
-                $lblStatusDetail.Text = "Copiando e validando SHA-256: $($p.CurrentIndex) / $($p.TotalFiles) fotos ($mbCopied MB de $mbTotal MB)"
-                $lblFileDetail.Text = "Foto: $($p.CurrentFile)"
+                $lblStatusDetail.Text = "Copiando e validando SHA-256: " + $p.CurrentIndex + " / " + $p.TotalFiles + " fotos (" + $mbCopied + " MB de " + $mbTotal + " MB)"
+                $lblFileDetail.Text = "Foto: " + $p.CurrentFile
                 $form.Update()
             }
         
         $progressBar.Value = 100
         $mbTotalDone = [math]::Round($res.TotalBytesCopied / 1MB, 1)
         
-        # Adiciona no histórico visual
         $item = New-Object System.Windows.Forms.ListViewItem((Get-Date -Format "HH:mm:ss"))
         [void]$item.SubItems.Add($res.CardIdentifier)
-        [void]$item.SubItems.Add("+$($res.CopiedCount) fotos")
-        [void]$item.SubItems.Add("$($res.SkippedCount) fotos")
-        [void]$item.SubItems.Add("$mbTotalDone MB")
-        [void]$item.SubItems.Add($(if ($res.Ejected) { "✓ Ejetado" } else { "-" }))
+        [void]$item.SubItems.Add("+" + $res.CopiedCount + " fotos")
+        [void]$item.SubItems.Add($res.SkippedCount.ToString() + " fotos")
+        [void]$item.SubItems.Add($mbTotalDone.ToString() + " MB")
+        [void]$item.SubItems.Add($(if ($res.Ejected) { "[OK] Ejetado" } else { "-" }))
         $gridHistory.Items.Insert(0, $item)
         
         if ($res.Ejected) {
-            $lblBadge.Text = "✓ CONCLUÍDO & EJETADO"
+            $lblBadge.Text = "[OK] CONCLUIDO & EJETADO"
             $lblBadge.ForeColor = $colorGreen
             $lblBadge.BackColor = [System.Drawing.Color]::FromArgb(40, 16, 185, 129)
-            $lblStatusDetail.Text = "✓ Backup 100% verificado! Cartão ejetado com segurança pelo Windows. Pode retirá-lo."
+            $lblStatusDetail.Text = "Backup 100% verificado! Cartao ejetado com seguranca pelo Windows. Pode retira-lo."
             $lblFileDetail.Text = ""
-            [System.Windows.Forms.MessageBox]::Show($form, "Backup concluído com sucesso e verificado com SHA-256!`n`nO cartão foi ejetado automaticamente pelo Windows.`nVocê pode retirá-lo agora sem abrir o explorador.", "Sucesso DIT", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+            [System.Windows.Forms.MessageBox]::Show($form, "Backup concluido com sucesso e verificado com SHA-256!`n`nO cartao foi ejetado automaticamente pelo Windows.`nVoce pode retira-lo agora sem abrir o explorador.", "Sucesso DIT", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
         } else {
-            $lblBadge.Text = "● SISTEMA ARMADO"
+            $lblBadge.Text = "[*] SISTEMA ARMADO"
             $lblBadge.ForeColor = $colorGreen
             $lblBadge.BackColor = [System.Drawing.Color]::FromArgb(20, 16, 185, 129)
-            $lblStatusDetail.Text = "✓ Backup concluído com sucesso."
+            $lblStatusDetail.Text = "Backup concluido com sucesso."
         }
     }
     catch {
-        $lblBadge.Text = "✖ ERRO NA INGESTÃO"
+        $lblBadge.Text = "[X] ERRO NA INGESTAO"
         $lblBadge.ForeColor = $colorRed
         $lblStatusDetail.Text = "Erro: $_"
-        [System.Windows.Forms.MessageBox]::Show($form, "Erro durante a ingestão: $_", "Erro", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        [System.Windows.Forms.MessageBox]::Show($form, "Erro durante a ingestao: $_", "Erro", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
     }
     finally {
         $btnStart.Enabled = $true
@@ -349,7 +344,6 @@ $btnStart.Add_Click({
     Run-AppIngest -SourcePath $txtSource.Text.Trim()
 })
 
-# Timer de Detecção Automática de Cartões (a cada 1.5s)
 $knownDrives = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 $drives = [System.IO.DriveInfo]::GetDrives() | Where-Object { $_.IsReady }
 foreach ($d in $drives) { [void]$knownDrives.Add($d.Name) }
