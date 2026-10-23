@@ -1,4 +1,4 @@
-# ConfigManager.ps1 - Gerenciador de Configurações e Eventos da Estação de Ingestão DIT
+# ConfigManager.ps1 - Gerenciador de Configuracoes e Eventos da Estacao de Ingestao DIT
 
 $script:DefaultConfigFile = [System.IO.Path]::Combine((Split-Path -Parent $PSScriptRoot), "config.json")
 
@@ -17,6 +17,18 @@ function Convert-PSObjectToHashtable {
         }
     }
     return $ht
+}
+
+function Test-DriveIsConnected {
+    param([string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+    try {
+        $root = [System.IO.Path]::GetPathRoot($Path)
+        if ([string]::IsNullOrWhiteSpace($root)) { return $false }
+        return (Test-Path $root)
+    } catch {
+        return $false
+    }
 }
 
 function Get-DefaultTargetDirectory {
@@ -58,7 +70,14 @@ function Get-StationConfig {
             $rawJson = Get-Content -Path $ConfigPath -Raw -Encoding UTF8
             $loaded = $rawJson | ConvertFrom-Json
             
-            if ($loaded.TargetRootPath) { $defaultConfig.TargetRootPath = $loaded.TargetRootPath }
+            if ($loaded.TargetRootPath) {
+                if (Test-DriveIsConnected -Path $loaded.TargetRootPath) {
+                    $defaultConfig.TargetRootPath = $loaded.TargetRootPath
+                } else {
+                    Write-Warning "Unidade de armazenamento '$($loaded.TargetRootPath)' nao esta conectada neste computador. Usando disco valido padrao: $defaultTarget"
+                    $defaultConfig.TargetRootPath = $defaultTarget
+                }
+            }
             if ($loaded.EventName) { $defaultConfig.EventName = $loaded.EventName }
             if ($loaded.CurrentEvent) { $defaultConfig.CurrentEvent = $loaded.CurrentEvent }
             else { $defaultConfig.CurrentEvent = $defaultConfig.EventName }
@@ -75,7 +94,7 @@ function Get-StationConfig {
             if ($loaded.CardMappings) { $defaultConfig.CardMappings = @($loaded.CardMappings) }
             if ($loaded.LastUpdated) { $defaultConfig.LastUpdated = $loaded.LastUpdated }
             
-            # Garante que o evento atual esteja inicializado no dicionário de Eventos
+            # Garante que o evento atual esteja inicializado no dicionario de Eventos
             $curName = $defaultConfig.CurrentEvent
             if (-not $defaultConfig.Events.ContainsKey($curName)) {
                 $defaultConfig.Events[$curName] = @{
@@ -84,15 +103,20 @@ function Get-StationConfig {
                     DefaultDestination = [System.IO.Path]::Combine($defaultConfig.TargetRootPath, $curName)
                     Cards              = @{}
                 }
+            } else {
+                $evDest = $defaultConfig.Events[$curName]["DefaultDestination"]
+                if (-not (Test-DriveIsConnected -Path $evDest)) {
+                    $defaultConfig.Events[$curName]["DefaultDestination"] = [System.IO.Path]::Combine($defaultConfig.TargetRootPath, $curName)
+                }
             }
             
             return $defaultConfig
         } catch {
-            Write-Warning "Falha ao ler $ConfigPath. Recriando configuração padrão..."
+            Write-Warning "Falha ao ler $ConfigPath. Recriando configuracao padrao..."
         }
     }
     
-    # Inicializa primeiro evento padrão
+    # Inicializa primeiro evento padrao
     $defaultConfig.Events[$defaultEventName] = @{
         Name               = $defaultEventName
         CreatedAt          = (Get-Date -Format "o")
@@ -129,12 +153,12 @@ function Set-StationConfig {
     
     if ($Config.ContainsKey("TargetRootPath")) {
         $dest = $Config["TargetRootPath"].Trim()
-        if ([string]::IsNullOrWhiteSpace($dest)) {
+        if ([string]::IsNullOrWhiteSpace($dest) -or (-not (Test-DriveIsConnected -Path $dest))) {
             $dest = Get-DefaultTargetDirectory
         }
         $Config["TargetRootPath"] = $dest
         if (!(Test-Path $dest)) {
-            New-Item -ItemType Directory -Path $dest -Force | Out-Null
+            try { New-Item -ItemType Directory -Path $dest -Force | Out-Null } catch {}
         }
     }
     
@@ -154,7 +178,7 @@ function Set-StationConfig {
     }
     
     $jsonContent = $Config | ConvertTo-Json -Depth 6
-    [System.IO.File]::WriteAllText($ConfigPath, $jsonContent, [System.Text.Encoding]::UTF8)
+    [System.IO.File]::WriteAllText($ConfigPath, $jsonContent, (New-Object System.Text.UTF8Encoding($true)))
     
     return $Config
 }
@@ -211,18 +235,18 @@ function New-StationEvent {
     
     $cleanName = $EventName -replace '[\\/:*?"<>|]', '_'
     if ([string]::IsNullOrWhiteSpace($cleanName)) {
-        throw "Nome de evento inválido."
+        throw "Nome de evento invalido."
     }
     
     $cfg = Get-StationConfig -ConfigPath $ConfigPath
-    $dest = if (![string]::IsNullOrWhiteSpace($DefaultDestination)) {
+    $dest = if (![string]::IsNullOrWhiteSpace($DefaultDestination) -and (Test-DriveIsConnected -Path $DefaultDestination)) {
         $DefaultDestination.Trim()
     } else {
         [System.IO.Path]::Combine($cfg.TargetRootPath, $cleanName)
     }
     
     if (!(Test-Path $dest)) {
-        New-Item -ItemType Directory -Path $dest -Force | Out-Null
+        try { New-Item -ItemType Directory -Path $dest -Force | Out-Null } catch {}
     }
     
     $evObj = @{
@@ -279,16 +303,78 @@ function Set-CurrentEvent {
     return $cleanName
 }
 
+function Set-EventDestination {
+    param(
+        [Parameter(Mandatory=$true)][string]$EventName,
+        [Parameter(Mandatory=$true)][string]$NewDestination,
+        [bool]$UpdateRegisteredCards = $true,
+        [string]$ConfigPath = $script:DefaultConfigFile
+    )
+    
+    $cleanDest = $NewDestination.Trim()
+    if ([string]::IsNullOrWhiteSpace($cleanDest)) {
+        throw "Caminho de destino invalido."
+    }
+    
+    if (-not (Test-DriveIsConnected -Path $cleanDest)) {
+        throw "A unidade de disco para '$cleanDest' nao esta conectada."
+    }
+    
+    if (!(Test-Path $cleanDest)) {
+        try { New-Item -ItemType Directory -Path $cleanDest -Force | Out-Null } catch {}
+    }
+    
+    $cfg = Get-StationConfig -ConfigPath $ConfigPath
+    $ht = @{}
+    foreach ($k in $cfg.Keys) { $ht[$k] = $cfg[$k] }
+    
+    if (-not $ht.Events.ContainsKey($EventName)) {
+        $ht.Events[$EventName] = @{
+            Name               = $EventName
+            CreatedAt          = (Get-Date -Format "o")
+            DefaultDestination = $cleanDest
+            Cards              = @{}
+        }
+    } else {
+        $ht.Events[$EventName]["DefaultDestination"] = $cleanDest
+        
+        if ($UpdateRegisteredCards -and $ht.Events[$EventName]["Cards"]) {
+            foreach ($cKey in $ht.Events[$EventName]["Cards"].Keys) {
+                $c = $ht.Events[$EventName]["Cards"][$cKey]
+                $photog = if ($c["Photographer"]) { $c["Photographer"] } else { $cKey }
+                $c["DestinationPath"] = [System.IO.Path]::Combine($cleanDest, ($photog -replace '[\\/:*?"<>|]', '_'))
+                if (!(Test-Path $c["DestinationPath"])) {
+                    try { New-Item -ItemType Directory -Path $c["DestinationPath"] -Force | Out-Null } catch {}
+                }
+            }
+        }
+    }
+    
+    $parent = Split-Path -Parent $cleanDest
+    if ($parent -and (Test-Path $parent)) {
+        $ht["TargetRootPath"] = $parent
+    } else {
+        $ht["TargetRootPath"] = $cleanDest
+    }
+    
+    Set-StationConfig -Config $ht -ConfigPath $ConfigPath | Out-Null
+    return $cleanDest
+}
+
 function Get-CurrentEvent {
     param([string]$ConfigPath = $script:DefaultConfigFile)
     $cfg = Get-StationConfig -ConfigPath $ConfigPath
     $curName = $cfg.CurrentEvent
     if ($cfg.Events -and $cfg.Events.ContainsKey($curName)) {
         $ev = $cfg.Events[$curName]
+        $defDest = $ev["DefaultDestination"]
+        if (-not (Test-DriveIsConnected -Path $defDest)) {
+            $defDest = [System.IO.Path]::Combine($cfg.TargetRootPath, $curName)
+        }
         return [PSCustomObject]@{
             Name               = $curName
             CreatedAt          = $ev["CreatedAt"]
-            DefaultDestination = $ev["DefaultDestination"]
+            DefaultDestination = $defDest
             Cards              = $ev["Cards"]
         }
     }
@@ -301,7 +387,7 @@ function Get-CurrentEvent {
 }
 
 # -----------------------------------------------------------------------------
-# CADASTRO E MAPEAMENTO DE CARTÕES POR EVENTO
+# CADASTRO E MAPEAMENTO DE CARTOES POR EVENTO
 # -----------------------------------------------------------------------------
 
 function Get-EventCards {
@@ -398,8 +484,14 @@ function Register-CardForEvent {
     $cleanDest = $DestinationPath.Trim()
     $cleanSubf = $PhotoSubfolder.Trim()
     
+    # Se o destino apontar para unidade inexistente, ajusta para o disco valido do sistema
+    if (-not (Test-DriveIsConnected -Path $cleanDest)) {
+        $curEv = Get-CurrentEvent -ConfigPath $ConfigPath
+        $cleanDest = [System.IO.Path]::Combine($curEv.DefaultDestination, ($cleanPhotog -replace '[\\/:*?"<>|]', '_'))
+    }
+    
     if (!(Test-Path $cleanDest)) {
-        New-Item -ItemType Directory -Path $cleanDest -Force | Out-Null
+        try { New-Item -ItemType Directory -Path $cleanDest -Force | Out-Null } catch {}
     }
     
     $ht = @{}
@@ -439,6 +531,30 @@ function Register-CardForEvent {
     }
 }
 
+function Remove-CardRegistration {
+    param(
+        [Parameter(Mandatory=$true)][string]$EventName,
+        [Parameter(Mandatory=$true)][string]$CardIdentifier,
+        [string]$ConfigPath = $script:DefaultConfigFile
+    )
+    
+    $cfg = Get-StationConfig -ConfigPath $ConfigPath
+    $cleanIdent = $CardIdentifier.Trim()
+    
+    $ht = @{}
+    foreach ($k in $cfg.Keys) { $ht[$k] = $cfg[$k] }
+    
+    if ($ht.Events -and $ht.Events.ContainsKey($EventName)) {
+        $ev = $ht.Events[$EventName]
+        if ($ev.ContainsKey("Cards") -and $ev["Cards"] -and $ev["Cards"].ContainsKey($cleanIdent)) {
+            $null = $ev["Cards"].Remove($cleanIdent)
+            Set-StationConfig -Config $ht -ConfigPath $ConfigPath | Out-Null
+            return $true
+        }
+    }
+    return $false
+}
+
 function Get-EventPhotographers {
     param(
         [Parameter(Mandatory=$true)][string]$EventName,
@@ -462,7 +578,7 @@ function Get-CardPhotoFolders {
     $candidates = [System.Collections.Generic.List[string]]::new()
     
     if (Test-Path $cleanRoot) {
-        # 1. Procura subpastas dentro de DCIM (padrão Canon, Nikon, Sony, Fuji)
+        # 1. Procura subpastas dentro de DCIM (padrao Canon, Nikon, Sony, Fuji)
         $dcim = Join-Path $cleanRoot "DCIM"
         if (Test-Path $dcim) {
             $sub = Get-ChildItem -Path $dcim -Directory -ErrorAction SilentlyContinue
@@ -474,13 +590,13 @@ function Get-CardPhotoFolders {
             }
         }
         
-        # 2. Procura padrão Sony Video (PRIVATE\M4ROOT\CLIP)
+        # 2. Procura padrao Sony Video (PRIVATE\M4ROOT\CLIP)
         $sonyClip = Join-Path $cleanRoot "PRIVATE\M4ROOT\CLIP"
         if (Test-Path $sonyClip) {
             $candidates.Add("PRIVATE\M4ROOT\CLIP")
         }
         
-        # 3. Procura outras pastas no 1º nível que contenham fotos/vídeos
+        # 3. Procura outras pastas no 1o nivel que contenham fotos/videos
         $topDirs = Get-ChildItem -Path $cleanRoot -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -notin @("DCIM", "MISC", "PRIVATE") }
         foreach ($td in $topDirs) {
             $hasMedia = Get-ChildItem -Path $td.FullName -File -ErrorAction SilentlyContinue | Where-Object {
@@ -492,8 +608,8 @@ function Get-CardPhotoFolders {
         }
     }
     
-    # 4. Raiz do cartão como opção
-    $candidates.Add("\ (Raiz do Cartão)")
+    # 4. Raiz do cartao como opcao
+    $candidates.Add("\ (Raiz do Cartao)")
     
     return $candidates.ToArray()
 }
@@ -525,7 +641,7 @@ function Set-MonitoringState {
 }
 
 # -----------------------------------------------------------------------------
-# RESOLUÇÃO DE DESTINO (COM SUPORTE A EVENTO E CARTÕES REGISTRADOS)
+# RESOLUCAO DE DESTINO (COM SUPORTE A EVENTO E CARTOES REGISTRADOS)
 # -----------------------------------------------------------------------------
 
 function Get-DestinationForCard {
@@ -538,10 +654,15 @@ function Get-DestinationForCard {
     
     $activeEvent = if (![string]::IsNullOrWhiteSpace($EventName)) { $EventName } else { $Config.EventName }
     
-    # 1. Checa cadastro específico do cartão no evento ativo
+    # 1. Checa cadastro especifico do cartao no evento ativo
     $cardReg = Get-CardRegistration -EventName $activeEvent -CardIdentifier $CardIdentifier -Config $Config
     if ($cardReg -and ![string]::IsNullOrWhiteSpace($cardReg.DestinationPath)) {
-        return $cardReg.DestinationPath
+        if (Test-DriveIsConnected -Path $cardReg.DestinationPath) {
+            return $cardReg.DestinationPath
+        }
+        # Fallback seguro caso o cartao esteja apontando para um disco desconectado (ex: E:\)
+        Write-Warning "Unidade do cadastro para '$CardIdentifier' nao esta conectada. Salvando no disco valido padrao..."
+        return [System.IO.Path]::Combine($Config.TargetRootPath, $activeEvent, $cardReg.Photographer)
     }
     
     # 2. Checa regras legadas de CardMappings (para retrocompatibilidade)
@@ -553,7 +674,7 @@ function Get-DestinationForCard {
                 if ($map.Identifier.Equals($CardIdentifier, [System.StringComparison]::OrdinalIgnoreCase) -or
                     $map.Identifier.Equals($driveRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
                     
-                    if (![string]::IsNullOrWhiteSpace($map.Destination)) {
+                    if (![string]::IsNullOrWhiteSpace($map.Destination) -and (Test-DriveIsConnected -Path $map.Destination)) {
                         return [System.IO.Path]::Combine($map.Destination, $activeEvent, $CardIdentifier)
                     }
                 }
@@ -561,7 +682,7 @@ function Get-DestinationForCard {
         }
     }
     
-    # 3. Destino padrão da estação: [DestinoRoot]\[Evento]\[Identificador]
+    # 3. Destino padrao da estacao: [DestinoRoot]\[Evento]\[Identificador]
     return [System.IO.Path]::Combine($Config.TargetRootPath, $activeEvent, $CardIdentifier)
 }
 

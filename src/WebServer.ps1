@@ -1,4 +1,4 @@
-# WebServer.ps1 - Servidor HTTP Local para Dashboard da Estação DIT
+﻿# WebServer.ps1 - Servidor HTTP Local para Dashboard da Estação DIT
 
 $cfgScript = Join-Path $PSScriptRoot "ConfigManager.ps1"
 $engScript = Join-Path $PSScriptRoot "IngestEngine.ps1"
@@ -383,6 +383,49 @@ function Handle-HttpRequest {
             $response.ContentType = "application/json; charset=utf-8"
             $response.ContentLength64 = $buffer.Length
             $response.OutputStream.Write($buffer, 0, $buffer.Length)
+        }
+        elseif ($path -eq "/api/card" -and ($request.HttpMethod -eq "DELETE" -or ($request.HttpMethod -eq "POST" -and $request.QueryString["action"] -eq "delete"))) {
+            $cfg = Get-StationConfig
+            $evName = if ($request.QueryString["event"]) { $request.QueryString["event"] } else { $cfg.CurrentEvent }
+            $id = $request.QueryString["id"]
+            if ([string]::IsNullOrWhiteSpace($id) -and $request.HasEntityBody) {
+                try {
+                    $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+                    $payload = $reader.ReadToEnd() | ConvertFrom-Json
+                    if ($payload.CardIdentifier) { $id = $payload.CardIdentifier }
+                    if ($payload.EventName) { $evName = $payload.EventName }
+                } catch {}
+            }
+            if ($id) {
+                $removed = Remove-CardRegistration -EventName $evName -CardIdentifier $id
+                $json = @{ Success = $removed; CardIdentifier = $id } | ConvertTo-Json
+                $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
+                $response.ContentType = "application/json; charset=utf-8"
+                $response.ContentLength64 = $buffer.Length
+                $response.OutputStream.Write($buffer, 0, $buffer.Length)
+            } else {
+                $response.StatusCode = 400
+                $errBytes = [System.Text.Encoding]::UTF8.GetBytes('{"Error":"Parametro id ou CardIdentifier obrigatorio"}')
+                $response.OutputStream.Write($errBytes, 0, $errBytes.Length)
+            }
+        }
+        elseif ($path -eq "/api/event/destination" -and $request.HttpMethod -eq "POST") {
+            $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+            $payload = $reader.ReadToEnd() | ConvertFrom-Json
+            $cfg = Get-StationConfig
+            $evName = if ($payload.EventName) { $payload.EventName } else { $cfg.CurrentEvent }
+            if ($payload.Destination) {
+                $newDest = Set-EventDestination -EventName $evName -NewDestination $payload.Destination -UpdateRegisteredCards $true
+                $json = @{ Success = $true; Destination = $newDest } | ConvertTo-Json
+                $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
+                $response.ContentType = "application/json; charset=utf-8"
+                $response.ContentLength64 = $buffer.Length
+                $response.OutputStream.Write($buffer, 0, $buffer.Length)
+            } else {
+                $response.StatusCode = 400
+                $errBytes = [System.Text.Encoding]::UTF8.GetBytes('{"Error":"Campo Destination obrigatorio"}')
+                $response.OutputStream.Write($errBytes, 0, $errBytes.Length)
+            }
         }
         elseif ($path -eq "/api/card/register" -and $request.HttpMethod -eq "POST") {
             $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)

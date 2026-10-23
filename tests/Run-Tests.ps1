@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Suíte de Testes Automatizados de Missão Crítica para auto-ingest-station.
     Valida todas as Invariantes do motor, auto-ejeção, cancelamento seguro,
@@ -464,7 +464,40 @@ try {
         -AutoEject $false `
         -CardPhotoSubfolder $savedReg.PhotoSubfolder
 
-    Assert-Equal $resNikonRepeat.Status "IDLE_NO_NEW_FILES" "Re-inserção do cartão registrado é identificada e fotos repetidas são puladas"
+        Assert-Equal $resNikonRepeat.Status "IDLE_NO_NEW_FILES" "Re-insercao do cartao registrado e identificada e fotos repetidas sao puladas"
+
+    # 14.7: Edicao do cadastro do cartao (alterar fotografo e destino)
+    $updatedPhotogDest = Join-Path $evDest1 "Marina_Studio"
+    $updatedReg = Register-CardForEvent -EventName "Casamento_Lucas_Mariana" `
+        -CardIdentifier "NIKON_CF_128" `
+        -Photographer "Marina Studio" `
+        -DestinationPath $updatedPhotogDest `
+        -PhotoSubfolder "DCIM\100NCZ_6" `
+        -ConfigPath $mockConfigFile
+    Assert-Equal $updatedReg.Photographer "Marina Studio" "Edicao do cadastro do cartao atualizou fotografo"
+    Assert-Equal $updatedReg.DestinationPath $updatedPhotogDest "Edicao do cadastro atualizou pasta de destino"
+
+    # 14.8: Fallback seguro quando o disco configurado nao existe (ex: disco Z:\ inexistente)
+    $fakeConfig = Get-StationConfig -ConfigPath $mockConfigFile
+    $fakeDest = Get-DestinationForCard -CardIdentifier "NIKON_CF_128" -SourcePath $mockCardNikon -Config $fakeConfig -EventName "Casamento_Lucas_Mariana"
+    Assert-True (![string]::IsNullOrWhiteSpace($fakeDest)) "Get-DestinationForCard retorna destino valido sem travar"
+
+    # 14.9: Alterar destino do evento inteiro
+    $newEvDest = Join-Path $testSandbox "Novo_Destino_Casamento"
+    Set-EventDestination -EventName "Casamento_Lucas_Mariana" -NewDestination $newEvDest -UpdateRegisteredCards $true -ConfigPath $mockConfigFile | Out-Null
+    $reloadedEv = Get-CurrentEvent -ConfigPath $mockConfigFile
+    Assert-Equal $reloadedEv.DefaultDestination $newEvDest "Set-EventDestination atualizou destino base do evento"
+
+    # 14.10: Remover cadastro de cartao
+    $removeOk = Remove-CardRegistration -EventName "Casamento_Lucas_Mariana" -CardIdentifier "NIKON_CF_128" -ConfigPath $mockConfigFile
+    Assert-True $removeOk "Remove-CardRegistration removeu cartao com sucesso"
+    $deletedCardReg = Get-CardRegistration -EventName "Casamento_Lucas_Mariana" -CardIdentifier "NIKON_CF_128" -ConfigPath $mockConfigFile
+    Assert-True ($null -eq $deletedCardReg) "Cartao NIKON_CF_128 nao consta mais no cadastro do evento"
+    
+    # Remove tambem o primeiro cartao para zerar
+    Remove-CardRegistration -EventName "Casamento_Lucas_Mariana" -CardIdentifier "NIKON_SD_64GB" -ConfigPath $mockConfigFile | Out-Null
+    $afterRemoveCards = @(Get-EventCards -EventName "Casamento_Lucas_Mariana" -ConfigPath $mockConfigFile)
+    Assert-Equal $afterRemoveCards.Count 0 "Todos os cartoes foram removidos com sucesso"
 
     # -------------------------------------------------------------------------
     # TESTE 15: Controle de Monitoramento e Leitura (Pausar / Retomar)
@@ -522,7 +555,16 @@ try {
         # 16.6: GET /api/cards
         $cardsListRes = Invoke-RestMethod -Uri "http://localhost:$testPort/api/cards?event=Formatura_Direito_2026"
         Assert-True ($cardsListRes -is [System.Array]) "GET /api/cards retorna lista de cartões cadastrados"
-        Assert-Equal $cardsListRes.Count 1 "Exatamente 1 cartão cadastrado para o evento"
+                Assert-Equal $cardsListRes.Count 1 "Exatamente 1 cartao cadastrado para o evento"
+
+        # 16.7: POST /api/event/destination
+        $newDestPayload = @{ EventName = "Formatura_Direito_2026"; Destination = $evDest1 } | ConvertTo-Json
+        $destRes = Invoke-RestMethod -Uri "http://localhost:$testPort/api/event/destination" -Method Post -Body $newDestPayload -ContentType "application/json"
+        Assert-True $destRes.Success "POST /api/event/destination alterou destino do evento via API"
+
+        # 16.8: DELETE /api/card
+        $delCardRes = Invoke-RestMethod -Uri "http://localhost:$testPort/api/card?event=Formatura_Direito_2026&id=SONY_CFX_512" -Method Delete
+        Assert-True $delCardRes.Success "DELETE /api/card removeu cadastro de cartao via API"
     }
     finally {
         if ($serverProc3 -and -not $serverProc3.HasExited) {

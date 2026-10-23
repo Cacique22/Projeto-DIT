@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -345,11 +345,12 @@
                                     <th>Fotógrafo</th>
                                     <th>Subpasta Origem</th>
                                     <th>Destino das Fotos</th>
+                                    <th>Acoes</th>
                                 </tr>
                             </thead>
                             <tbody id="registeredCardsTableBody">
                                 <tr>
-                                    <td colspan="4" style="text-align:center; color:var(--text-muted); padding:20px;">
+                                    <td colspan="5" style="text-align:center; color:var(--text-muted); padding:20px;">
                                         Nenhum cartão cadastrado ainda para este evento. Insira um cartão para cadastrar!
                                     </td>
                                 </tr>
@@ -625,7 +626,7 @@
             if (!cards || cards.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="4" style="text-align:center; color:var(--text-muted); padding:20px;">
+                        <td colspan="5" style="text-align:center; color:var(--text-muted); padding:20px;">
                             Nenhum cartão cadastrado ainda para este evento. Insira um cartão para cadastrar!
                         </td>
                     </tr>
@@ -633,14 +634,50 @@
                 return;
             }
 
-            tbody.innerHTML = cards.map(c => `
+            tbody.innerHTML = cards.map(c => {
+                const safePhotog = (c.Photographer || '').replace(/'/g, "\\'");
+                const safeSubf = (c.PhotoSubfolder || '').replace(/'/g, "\\'");
+                const safeDest = (c.DestinationPath || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                return `
                 <tr>
                     <td><b class="mono" style="color:var(--brand-cyan);">${c.CardIdentifier}</b></td>
                     <td><b>${c.Photographer}</b></td>
                     <td class="mono" style="font-size:0.8rem;">${c.PhotoSubfolder || '\\ (Raiz)'}</td>
                     <td class="mono" style="font-size:0.8rem; word-break:break-all;">${c.DestinationPath}</td>
+                    <td>
+                        <div style="display:flex; gap:6px;">
+                            <button class="btn" style="padding:4px 8px; font-size:0.75rem; background:rgba(6,182,212,0.2); color:var(--brand-cyan);" onclick="editCardRegistration('${c.CardIdentifier}', '${safePhotog}', '${safeSubf}', '${safeDest}')">Editar</button>
+                            <button class="btn" style="padding:4px 8px; font-size:0.75rem; background:rgba(239,68,68,0.2); color:var(--error-red);" onclick="deleteCardRegistration('${c.CardIdentifier}')">Excluir</button>
+                        </div>
+                    </td>
                 </tr>
-            `).join('');
+            `}).join('');
+        }
+
+                async function deleteCardRegistration(cardId) {
+            if (!confirm(`Deseja realmente excluir o cadastro do cartao '${cardId}'?\n\nAo reconectar o cartao, o sistema solicitara um novo cadastro.`)) {
+                return;
+            }
+            try {
+                const res = await fetch(`/api/card?id=${encodeURIComponent(cardId)}`, { method: 'DELETE' });
+                if (res.ok) {
+                    showToast("Cadastro de cartao excluido.");
+                    loadCards();
+                } else {
+                    const err = await res.json();
+                    alert("Erro ao excluir: " + (err.Error || "Falha na requisicao"));
+                }
+            } catch (e) {
+                alert("Erro: " + e.message);
+            }
+        }
+
+        function editCardRegistration(ident, photog, subf, dest) {
+            document.getElementById('cardModalIdentifier').value = ident;
+            document.getElementById('cardModalPhotographer').value = photog;
+            document.getElementById('cardModalSubfolder').value = subf || '';
+            document.getElementById('cardModalDestination').value = dest;
+            document.getElementById('cardSetupModal').classList.add('active');
         }
 
         async function toggleMonitoring() {
