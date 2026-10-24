@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Script principal de inicialização da Estação de Ingestão DIT.
     Inicia o Servidor Web, o Daemon de Detecção e Ejeção Automática de Cartões.
@@ -84,10 +84,23 @@ try {
                         }
                         
                         if ((Test-Path $dcim) -or (Test-Path $fotografoTxt) -or ($photos -and $photos.Count -gt 0)) {
-                            Write-Host "[!] Cartão fotográfico reconhecido! Iniciando ingestão automática..." -ForegroundColor Green
+                            $cardId = Get-CardIdentifier -DriveLetter $driveName
+                            $activeEv = if (![string]::IsNullOrWhiteSpace($cfg.CurrentEvent)) { $cfg.CurrentEvent } else { $cfg.EventName }
+                            $cardReg = Get-CardRegistration -EventName $activeEv -CardIdentifier $cardId -Config $cfg
+                            
+                            if ($null -eq $cardReg) {
+                                Write-Host "`n[!] NOVO CARTAO DETECTADO: $cardId na unidade $driveName" -ForegroundColor Yellow
+                                Write-Host "[!] Cartao ainda nao cadastrado no evento ativo ''$activeEv''!" -ForegroundColor Yellow
+                                Write-Host "[i] Acesse o Painel Web (http://localhost:$($cfg.Port)/) para cadastrar o fotografo." -ForegroundColor Cyan
+                                Write-Host "[i] O cartao permanece montado e acessivel (NAO sera ejetado).`n" -ForegroundColor Green
+                                [void]$knownDrives.Add($driveName)
+                                continue
+                            }
+
+                            Write-Host "[!] Cartao reconhecido ($($cardReg.Photographer))! Iniciando ingestao segura..." -ForegroundColor Green
                             $res = Start-StationIngestProcess -SourceDrive $driveName -AutoEject $cfg.AutoEject
                             if ($res.Ejected) {
-                                Write-Host "[⏏] Cartão $driveName ejetado com segurança. Pode retirar." -ForegroundColor Yellow
+                                Write-Host "[⏏] Cartao $driveName ejetado com seguranca. Pode retirar." -ForegroundColor Yellow
                             }
                         }
                         

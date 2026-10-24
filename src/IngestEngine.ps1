@@ -284,10 +284,9 @@ function Invoke-CardIngest {
     if ($filesToCopy.Count -eq 0) {
         Emit-IngestSound -Type "Success"
         
-        $ejectResult = $null
-        if ($AutoEject) {
-            $ejectResult = Invoke-SafeCardEject -DriveOrPath $cleanSource
-        }
+        # Invariante DIT: NUNCA ejetar o cartão se nenhuma foto nova foi copiada.
+        # Mantém o cartão acessível para inspeção, cadastro ou verificação manual.
+        $ejectResult = @{ Success = $false; Message = "Cartão mantido montado com segurança (nenhuma foto nova para copiar)." }
         
         return @{
             Status           = "IDLE_NO_NEW_FILES"
@@ -299,8 +298,8 @@ function Invoke-CardIngest {
             Destination      = $finalDestination
             DurationSeconds  = 0
             Errors           = @()
-            Ejected          = ($ejectResult -and $ejectResult.Success)
-            EjectMessage     = if ($ejectResult) { $ejectResult.Message } else { "" }
+            Ejected          = $false
+            EjectMessage     = "Nenhuma foto nova para copiar. Cartão mantido montado com segurança."
         }
     }
     
@@ -485,7 +484,7 @@ function Invoke-CardIngest {
     }
     
     $ejectResult = $null
-    if ($AutoEject -and $errors.Count -eq 0) {
+    if ($AutoEject -and $errors.Count -eq 0 -and $copiedCount -gt 0) {
         $ejectResult = Invoke-SafeCardEject -DriveOrPath $cleanSource
     }
     

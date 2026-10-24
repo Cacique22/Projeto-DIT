@@ -877,16 +877,22 @@ function Show-CardSetupModal {
     # ----- Rodape
     $footer = New-ModalFooter
     $saveText = if ($isEditMode) { "Salvar alterações" } else { "Salvar e iniciar descarga" }
-    $btnSave = New-Btn $saveText 'success' 220 42
-    $btnCancelModal = New-Btn "Cancelar" 'secondary' 110 42
+    $btnSave = New-Btn $saveText 'success' 210 42
+    $btnSaveOnly = New-Btn "Apenas salvar cadastro" 'primary' 190 42
+    $btnSaveOnly.Margin = New-Object System.Windows.Forms.Padding(10, 0, 0, 0)
+    $btnCancelModal = New-Btn "Cancelar" 'secondary' 100 42
     $btnCancelModal.Margin = New-Object System.Windows.Forms.Padding(10, 0, 0, 0)
     $footer.Controls.Add($btnSave)
+    if (-not $isEditMode) {
+        $footer.Controls.Add($btnSaveOnly)
+    }
     $footer.Controls.Add($btnCancelModal)
     $root.Controls.Add($footer, 0, 2)
     $setupModal.AcceptButton = $btnSave
     $setupModal.CancelButton = $btnCancelModal
 
-    $btnSave.Add_Click({
+    $saveAction = {
+        param([bool]$startIngest)
         $photogName = $cmbPhotog.Text.Trim()
         $subfPath = $cmbSubf.Text.Trim()
         $destPath = $txtDest.Text.Trim()
@@ -911,15 +917,26 @@ function Show-CardSetupModal {
             $subfPath = ""
         }
 
-        $script:RegisteredResult = Register-CardForEvent -EventName $EventName `
+        $reg = Register-CardForEvent -EventName $EventName `
             -CardIdentifier $CardIdentifier `
             -Photographer $photogName `
             -DestinationPath $destPath `
             -PhotoSubfolder $subfPath
 
+        $script:RegisteredResult = [PSCustomObject]@{
+            CardIdentifier    = $reg.CardIdentifier
+            Photographer      = $reg.Photographer
+            DestinationPath   = $reg.DestinationPath
+            PhotoSubfolder    = $reg.PhotoSubfolder
+            ShouldStartIngest = $startIngest
+        }
+
         $setupModal.DialogResult = [System.Windows.Forms.DialogResult]::OK
         $setupModal.Close()
-    })
+    }
+
+    $btnSave.Add_Click({ & $saveAction $true })
+    $btnSaveOnly.Add_Click({ & $saveAction $false })
 
     $btnCancelModal.Add_Click({
         $script:RegisteredResult = $null
@@ -1025,6 +1042,19 @@ $headerPanel.Controls.Add($lblActiveEventBadge, 3, 0)
 $btnSwitchEvent = New-Btn "Trocar / novo evento" 'secondary' 170 38
 $btnSwitchEvent.Anchor = [System.Windows.Forms.AnchorStyles]::Right
 $headerPanel.Controls.Add($btnSwitchEvent, 4, 0)
+
+$btnToggleAutoEject = New-Btn (if ($script:CurrentConfig.AutoEject) { "⏏ Auto-ejetar: ATIVO" } else { "⏏ Auto-ejetar: DESATIVADO" }) (if ($script:CurrentConfig.AutoEject) { 'secondary' } else { 'warning' }) 190 38
+$btnToggleAutoEject.Anchor = [System.Windows.Forms.AnchorStyles]::Right
+$btnToggleAutoEject.Margin = New-Object System.Windows.Forms.Padding(8, 0, 0, 0)
+$btnToggleAutoEject.Add_Click({
+    $script:CurrentConfig.AutoEject = -not $script:CurrentConfig.AutoEject
+    Set-StationConfig -AutoEject $script:CurrentConfig.AutoEject | Out-Null
+    $btnToggleAutoEject.Text = if ($script:CurrentConfig.AutoEject) { "⏏ Auto-ejetar: ATIVO" } else { "⏏ Auto-ejetar: DESATIVADO" }
+    $btnToggleAutoEject.Tag = if ($script:CurrentConfig.AutoEject) { 'secondary' } else { 'warning' }
+    Update-BtnLook $btnToggleAutoEject
+    $lblStatusDetail.Text = "Configuração: Auto-ejetar " + (if ($script:CurrentConfig.AutoEject) { 'ATIVADO (ejeta apenas se novas fotos forem verificadas)' } else { 'DESATIVADO (o cartão permanecerá sempre montado)' })
+})
+$headerPanel.Controls.Add($btnToggleAutoEject, 5, 0)
 
 # ----- AVISO DE UNIDADE DESCONECTADA
 $bannerWarning = New-Object System.Windows.Forms.Panel
@@ -1561,11 +1591,26 @@ $btnRemoveCard.Add_Click({
 
 # Acao: Cadastrar Cartao Manualmente
 $btnAddCardManual.Add_Click({
+    $detectedDrive = "C:\"
     $defaultId = "CARTAO_" + (Get-Random -Minimum 100 -Maximum 999)
+    try {
+        $ready = [System.IO.DriveInfo]::GetDrives() | Where-Object { $_.IsReady -and $_.DriveType -eq 'Removable' }
+        if (-not $ready -or $ready.Count -eq 0) {
+            $ready = [System.IO.DriveInfo]::GetDrives() | Where-Object { $_.IsReady -and $_.Name -ne 'C:\' }
+        }
+        if ($ready -and $ready.Count -gt 0) {
+            $detectedDrive = $ready[0].Name
+            $fromDriveId = Get-CardIdentifier -DriveLetter $detectedDrive
+            if ($fromDriveId -and $fromDriveId -ne "Cartao_Desconhecido") {
+                $defaultId = $fromDriveId
+            }
+        }
+    } catch {}
+
     $cardIdInput = Show-TextPrompt -Title "Cadastrar novo cartão" -Message "Informe um nome ou identificador para o cartão (ex.: CARD_01 ou EOS_DIGITAL):" -DefaultText $defaultId
     if ([string]::IsNullOrWhiteSpace($cardIdInput)) { return }
 
-    $res = Show-CardSetupModal -DriveLetter "C:\" -CardIdentifier $cardIdInput.Trim() -EventName $script:CurrentEvent
+    $res = Show-CardSetupModal -DriveLetter $detectedDrive -CardIdentifier $cardIdInput.Trim() -EventName $script:CurrentEvent
     if ($null -ne $res) {
         $script:CurrentConfig = Get-StationConfig
         Refresh-EventCardsGrid
@@ -1611,6 +1656,12 @@ function Run-AppIngest {
         }
         $script:CurrentConfig = Get-StationConfig
         Refresh-EventCardsGrid
+
+        if ($cardReg.PSObject.Properties['ShouldStartIngest'] -and $cardReg.ShouldStartIngest -eq $false) {
+            Set-AppStatus 'ok' "CARTÃO CADASTRADO COM SUCESSO" "Cartão $cardId cadastrado para $($cardReg.Photographer). O cartão foi mantido montado."
+            $lblFileDetail.Text = "Cadastro salvo no evento $script:CurrentEvent. O cartão não foi ejetado. Clique em 'Descarregar agora' quando quiser descarregar."
+            return
+        }
     }
 
     $targetDest = Get-DestinationForCard -CardIdentifier $cardId -SourcePath $SourcePath -Config $script:CurrentConfig -EventName $script:CurrentEvent
