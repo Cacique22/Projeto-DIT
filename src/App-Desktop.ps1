@@ -1366,6 +1366,7 @@ function Set-Progress {
     param([int]$Percent)
     $script:ProgressPct = [math]::Max(0, [math]::Min(100, $Percent))
     $pnlTrack.Invalidate()
+    $pnlTrack.Update()
 }
 
 function Set-ActiveEventBadge {
@@ -1636,10 +1637,13 @@ function Run-AppIngest {
             -CancelCheck { return $script:CancelRequested } `
             -ProgressCallback {
                 param($prog)
-                if ($prog.TotalFiles -gt 0) {
-                    $pct = [math]::Min(100, [int](($prog.ProcessedFiles / $prog.TotalFiles) * 100))
-                    Set-Progress $pct
-                    $lblProgressMetrics.Text = "$($prog.ProcessedFiles) / $($prog.TotalFiles) fotos  ·  $pct%"
+                $done = if ($null -ne $prog.CurrentIndex) { $prog.CurrentIndex } elseif ($null -ne $prog.ProcessedFiles) { $prog.ProcessedFiles } elseif ($null -ne $prog.FilesDone) { $prog.FilesDone } else { 0 }
+                $total = if ($null -ne $prog.TotalFiles) { $prog.TotalFiles } else { 0 }
+                $pct = if ($null -ne $prog.Percent) { $prog.Percent } elseif ($total -gt 0) { [math]::Min(100, [int](($done / $total) * 100)) } else { 0 }
+
+                Set-Progress $pct
+                if ($total -gt 0) {
+                    $lblProgressMetrics.Text = "$done / $total fotos  -  $pct%"
                 }
                 $lblFileDetail.Text = "$($prog.CurrentFile)"
                 [System.Windows.Forms.Application]::DoEvents()
@@ -1652,6 +1656,13 @@ function Run-AppIngest {
             Add-HistoryRow -Time (Get-Date -Format "HH:mm:ss") -Who $who -Photos "+$($res.CopiedCount)" -Volume "$mb MB" -StatusText "Interrompido" -StatusColor $colorAmber
             Set-AppStatus 'warn' "INTERROMPIDO COM SEGURANÇA" "Descarga interrompida por você. Nenhum arquivo foi corrompido e o cartão está intacto."
             [System.Windows.Forms.MessageBox]::Show($form, "Descarga interrompida com total segurança!`n`nNenhum arquivo foi corrompido, os arquivos já verificados continuam salvos e o cartão está intacto.", "Interrupção segura", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+        }
+        elseif ($res.Status -eq "IDLE_NO_NEW_FILES") {
+            Add-HistoryRow -Time (Get-Date -Format "HH:mm:ss") -Who $who -Photos "0 fotos novas" -Volume "0 MB" -StatusText "Todas ja salvas" -StatusColor $colorCyan
+            Set-Progress 100
+            Set-AppStatus 'ok' "NENHUMA FOTO NOVA" "Todas as fotos deste cartao ja foram descarregadas anteriormente com integridade SHA-256."
+            $lblProgressMetrics.Text = "$($res.SkippedCount) fotos ignoradas (idempotencia)"
+            $lblFileDetail.Text = "Idempotente: nenhuma copia duplicada necessaria."
         }
         elseif ($res.Ejected) {
             Add-HistoryRow -Time (Get-Date -Format "HH:mm:ss") -Who $who -Photos "+$($res.CopiedCount)" -Volume "$mb MB" -StatusText "Salvo e ejetado" -StatusColor $colorGreen

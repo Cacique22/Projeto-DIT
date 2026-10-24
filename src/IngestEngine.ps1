@@ -317,6 +317,20 @@ function Invoke-CardIngest {
     $errors = [System.Collections.Generic.List[string]]::new()
     $wasAborted = $false
     
+    if ($ProgressCallback) {
+        & $ProgressCallback @{
+            CurrentIndex   = 0
+            ProcessedFiles = 0
+            FilesDone      = 0
+            TotalFiles     = $filesToCopy.Count
+            CurrentFile    = "Iniciando copia e validacao SHA-256..."
+            BytesCopied    = 0
+            TotalBytes     = $totalNewBytes
+            Percent        = 0
+            Status         = "STARTING"
+        }
+    }
+
     for ($i = 0; $i -lt $filesToCopy.Count; $i++) {
         
         # Invariante de Interrupção Segura: Checa se o usuário solicitou cancelamento antes de cada foto
@@ -339,6 +353,19 @@ function Invoke-CardIngest {
         }
         
         $srcFile = $filesToCopy[$i]
+        if ($ProgressCallback) {
+            & $ProgressCallback @{
+                CurrentIndex   = $i
+                ProcessedFiles = $i
+                FilesDone      = $i
+                TotalFiles     = $filesToCopy.Count
+                CurrentFile    = "Copiando: $($srcFile.Name)..."
+                BytesCopied    = $bytesTransferred
+                TotalBytes     = $totalNewBytes
+                Percent        = if ($filesToCopy.Count -gt 0) { [math]::Min(100, [int](($i / $filesToCopy.Count) * 100)) } else { 0 }
+                Status         = "COPYING"
+            }
+        }
         $relPath = $srcFile.FullName.Substring($searchRoot.Length)
         $targetFile = [System.IO.Path]::Combine($finalDestination, $relPath)
         $targetDir = [System.IO.Path]::GetDirectoryName($targetFile)
@@ -398,11 +425,15 @@ function Invoke-CardIngest {
             
             if ($ProgressCallback) {
                 & $ProgressCallback @{
-                    CurrentIndex = $i + 1
-                    TotalFiles   = $filesToCopy.Count
-                    CurrentFile  = $srcFile.Name
-                    BytesCopied  = $bytesTransferred
-                    TotalBytes   = $totalNewBytes
+                    CurrentIndex   = $i + 1
+                    ProcessedFiles = $i + 1
+                    FilesDone      = $i + 1
+                    TotalFiles     = $filesToCopy.Count
+                    CurrentFile    = "Verificado: $($srcFile.Name)"
+                    BytesCopied    = $bytesTransferred
+                    TotalBytes     = $totalNewBytes
+                    Percent        = if ($filesToCopy.Count -gt 0) { [math]::Min(100, [int]((($i + 1) / $filesToCopy.Count) * 100)) } else { 100 }
+                    Status         = "VERIFIED"
                 }
             }
         }

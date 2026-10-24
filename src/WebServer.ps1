@@ -90,12 +90,12 @@ function Start-StationIngestProcess {
             -CardPhotoSubfolder $resolvedSubfolder `
             -ProgressCallback {
                 param($p)
-                $script:FilesDone = $p.CurrentIndex
+                $script:FilesDone = if ($null -ne $p.CurrentIndex) { $p.CurrentIndex } else { $p.FilesDone }
                 $script:TotalFiles = $p.TotalFiles
                 $script:BytesDone = $p.BytesCopied
                 $script:TotalBytes = $p.TotalBytes
                 $script:CurrentFile = $p.CurrentFile
-                $script:StatusMessage = "Copiando ($($p.CurrentIndex)/$($p.TotalFiles)): $($p.CurrentFile)"
+                $script:StatusMessage = "$($p.CurrentFile) ($($script:FilesDone)/$($p.TotalFiles))"
             }
         
         $historyItem = [ordered]@{
